@@ -1,0 +1,30 @@
+{
+  "project_info": {
+    "project_number": "41729518235",
+    "firebase_url": "https://water-quality-monitoring-94502-default-rtdb.asia-southeast1.firebasedatabase.app",
+    "project_id": "water-quality-monitoring-94502",
+    "storage_bucket": "water-quality-monitoring-94502.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:41729518235:android:f54da50bc69dd860c2343e",
+        "android_client_info": {
+          "package_name": "com.example.water_quality_app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBHS3iTA3Ut913PVBS4DNBrP-mVKwCjdP8"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

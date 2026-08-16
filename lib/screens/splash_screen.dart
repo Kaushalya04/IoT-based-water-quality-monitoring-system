@@ -1,34 +1,56 @@
 import 'dart:async';
 
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
-import 'package:iconsax_flutter/iconsax_flutter.dart';
+import 'package:google_fonts/google_fonts.dart';
 
+import 'dashboard_screen.dart';
 import 'login_screen.dart';
-//import '../utils/app_colors.dart';
 
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
 
   @override
-  State<SplashScreen> createState() => _SplashScreenState();
+  State<SplashScreen> createState() =>
+      _SplashScreenState();
 }
 
-class _SplashScreenState extends State<SplashScreen> {
-
+class _SplashScreenState
+    extends State<SplashScreen> {
   @override
   void initState() {
     super.initState();
+    checkLoginStatus();
+  }
 
-   Timer(const Duration(seconds: 3), () {
+  Future<void> checkLoginStatus() async {
+    // Keep splash visible for a short time
+    await Future.delayed(
+      const Duration(seconds: 2),
+    );
 
-  Navigator.pushReplacement(
-    context,
-    MaterialPageRoute(
-      builder: (context) => LoginScreen(),
-    ),
-  );
+    if (!mounted) return;
 
-});
+    final User? user =
+        FirebaseAuth.instance.currentUser;
+
+    if (user != null) {
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(
+          builder: (context) =>
+              const DashboardScreen(),
+        ),
+      );
+    } else {
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(
+          builder: (context) =>
+              const LoginScreen(),
+        ),
+      );
+    }
   }
 
   @override
@@ -36,50 +58,98 @@ class _SplashScreenState extends State<SplashScreen> {
     return Scaffold(
       body: Container(
         width: double.infinity,
+        height: double.infinity,
         decoration: const BoxDecoration(
           gradient: LinearGradient(
-            colors: [
-              Color(0xff0EA5E9),
-              Color(0xff38BDF8),
-            ],
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
+            colors: [
+              Color(0xff0369A1),
+              Color(0xff0284C7),
+              Color(0xff38BDF8),
+            ],
           ),
         ),
-        child: const Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(
-              Iconsax.drop,
-              color: Colors.white,
-              size: 90,
-            ),
+        child: SafeArea(
+          child: Center(
+            child: Padding(
+              padding: const EdgeInsets.all(25),
+              child: Column(
+                mainAxisAlignment:
+                    MainAxisAlignment.center,
+                children: [
+                  Container(
+                    padding:
+                        const EdgeInsets.all(25),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withValues(
+                        alpha: 0.18,
+                      ),
+                      shape: BoxShape.circle,
+                      border: Border.all(
+                        color:
+                            Colors.white.withValues(
+                          alpha: 0.35,
+                        ),
+                        width: 2,
+                      ),
+                    ),
+                    child: const Icon(
+                      Icons.water_drop,
+                      size: 80,
+                      color: Colors.white,
+                    ),
+                  ),
 
-            SizedBox(height: 20),
+                  const SizedBox(height: 30),
 
-            Text(
-              "Water Quality",
-              style: TextStyle(
-                color: Colors.white,
-                fontSize: 30,
-                fontWeight: FontWeight.bold,
+                  Text(
+                    "Water Quality",
+                    textAlign: TextAlign.center,
+                    style: GoogleFonts.poppins(
+                      fontSize: 32,
+                      fontWeight:
+                          FontWeight.bold,
+                      color: Colors.white,
+                    ),
+                  ),
+
+                  Text(
+                    "Monitoring System",
+                    textAlign: TextAlign.center,
+                    style: GoogleFonts.poppins(
+                      fontSize: 20,
+                      fontWeight:
+                          FontWeight.w500,
+                      color: Colors.white70,
+                    ),
+                  ),
+
+                  const SizedBox(height: 18),
+
+                  Text(
+                    "Monitor • Protect • Control",
+                    style: GoogleFonts.poppins(
+                      fontSize: 13,
+                      color: Colors.white70,
+                    ),
+                  ),
+
+                  const SizedBox(height: 45),
+
+                  const SizedBox(
+                    width: 28,
+                    height: 28,
+                    child:
+                        CircularProgressIndicator(
+                      strokeWidth: 2.5,
+                      color: Colors.white,
+                    ),
+                  ),
+                ],
               ),
             ),
-
-            Text(
-              "Monitoring System",
-              style: TextStyle(
-                color: Colors.white70,
-                fontSize: 18,
-              ),
-            ),
-
-            SizedBox(height: 40),
-
-            CircularProgressIndicator(
-              color: Colors.white,
-            ),
-          ],
+          ),
         ),
       ),
     );

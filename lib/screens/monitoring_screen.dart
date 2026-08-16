@@ -9,7 +9,8 @@ class MonitoringScreen extends StatefulWidget {
   const MonitoringScreen({super.key});
 
   @override
-  State<MonitoringScreen> createState() => _MonitoringScreenState();
+  State<MonitoringScreen> createState() =>
+      _MonitoringScreenState();
 }
 
 class _MonitoringScreenState extends State<MonitoringScreen> {
@@ -86,8 +87,7 @@ class _MonitoringScreenState extends State<MonitoringScreen> {
         double newTurbidity = 0;
 
         if (rawTurbidity is num) {
-          newTurbidity =
-              rawTurbidity.toDouble();
+          newTurbidity = rawTurbidity.toDouble();
         } else {
           newTurbidity =
               double.tryParse(
@@ -100,9 +100,7 @@ class _MonitoringScreenState extends State<MonitoringScreen> {
           turbidity = newTurbidity;
 
           valve =
-              data['valve']
-                      ?.toString()
-                      .toUpperCase() ??
+              data['valve']?.toString().toUpperCase() ??
                   "UNKNOWN";
 
           isConnected = true;
@@ -132,17 +130,28 @@ class _MonitoringScreenState extends State<MonitoringScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final bool isDark =
+        Theme.of(context).brightness == Brightness.dark;
+
+    final Color backgroundColor = isDark
+        ? const Color(0xff0F172A)
+        : const Color(0xffF4F9FC);
+
+    final Color cardColor = isDark
+        ? const Color(0xff1E293B)
+        : Colors.white;
+
     if (isLoading) {
-      return const Scaffold(
-        backgroundColor: Color(0xffF4F9FC),
-        body: Center(
+      return Scaffold(
+        backgroundColor: backgroundColor,
+        body: const Center(
           child: CircularProgressIndicator(),
         ),
       );
     }
 
     return Scaffold(
-      backgroundColor: const Color(0xffF4F9FC),
+      backgroundColor: backgroundColor,
 
       appBar: AppBar(
         title: const Text("Live Monitoring"),
@@ -161,13 +170,11 @@ class _MonitoringScreenState extends State<MonitoringScreen> {
               isDesktop ? 35 : 20,
               120,
             ),
-
             child: Center(
               child: ConstrainedBox(
                 constraints: const BoxConstraints(
                   maxWidth: 900,
                 ),
-
                 child: Column(
                   children: [
                     monitoringCard(
@@ -190,7 +197,9 @@ class _MonitoringScreenState extends State<MonitoringScreen> {
                         width: double.infinity,
                         padding: const EdgeInsets.all(15),
                         decoration: BoxDecoration(
-                          color: Colors.orange.shade50,
+                          color: isDark
+                              ? const Color(0xff3B2F1B)
+                              : Colors.orange.shade50,
                           borderRadius:
                               BorderRadius.circular(15),
                         ),
@@ -204,9 +213,8 @@ class _MonitoringScreenState extends State<MonitoringScreen> {
                             Expanded(
                               child: Text(
                                 errorMessage!,
-                                style: TextStyle(
-                                  color:
-                                      Colors.orange.shade900,
+                                style: const TextStyle(
+                                  color: Colors.orange,
                                   fontWeight:
                                       FontWeight.w600,
                                 ),
@@ -222,20 +230,21 @@ class _MonitoringScreenState extends State<MonitoringScreen> {
                     Container(
                       width: double.infinity,
                       padding: const EdgeInsets.all(28),
-
                       decoration: BoxDecoration(
-                        color: Colors.white,
+                        color: cardColor,
                         borderRadius:
                             BorderRadius.circular(25),
-                        boxShadow: const [
+                        boxShadow: [
                           BoxShadow(
-                            color: Colors.black12,
+                            color: Colors.black.withValues(
+                              alpha:
+                                  isDark ? 0.25 : 0.08,
+                            ),
                             blurRadius: 10,
-                            offset: Offset(0, 5),
+                            offset: const Offset(0, 5),
                           ),
                         ],
                       ),
-
                       child: Column(
                         children: [
                           Container(
@@ -243,7 +252,9 @@ class _MonitoringScreenState extends State<MonitoringScreen> {
                                 const EdgeInsets.all(15),
                             decoration: BoxDecoration(
                               color: AppColors.primary
-                                  .withValues(alpha: 0.12),
+                                  .withValues(
+                                alpha: 0.15,
+                              ),
                               shape: BoxShape.circle,
                             ),
                             child: Icon(
@@ -259,10 +270,13 @@ class _MonitoringScreenState extends State<MonitoringScreen> {
 
                           const SizedBox(height: 15),
 
-                          const Text(
+                          Text(
                             "Turbidity Level",
                             style: TextStyle(
                               fontSize: 18,
+                              color: isDark
+                                  ? Colors.white70
+                                  : Colors.black87,
                             ),
                           ),
 
@@ -300,8 +314,9 @@ class _MonitoringScreenState extends State<MonitoringScreen> {
                                 : isClean
                                     ? Colors.green
                                     : Colors.red,
-                            backgroundColor:
-                                Colors.grey.shade200,
+                            backgroundColor: isDark
+                                ? Colors.white12
+                                : Colors.grey.shade200,
                           ),
 
                           const SizedBox(height: 12),
@@ -409,10 +424,16 @@ class _MonitoringScreenState extends State<MonitoringScreen> {
                       padding: const EdgeInsets.all(20),
                       decoration: BoxDecoration(
                         color: !isConnected
-                            ? Colors.grey.shade100
+                            ? isDark
+                                ? const Color(0xff1E293B)
+                                : Colors.grey.shade100
                             : isClean
-                                ? Colors.green.shade50
-                                : Colors.red.shade50,
+                                ? isDark
+                                    ? const Color(0xff12372A)
+                                    : Colors.green.shade50
+                                : isDark
+                                    ? const Color(0xff451A1A)
+                                    : Colors.red.shade50,
                         borderRadius:
                             BorderRadius.circular(20),
                       ),
@@ -443,10 +464,16 @@ class _MonitoringScreenState extends State<MonitoringScreen> {
                                       : "Dirty water detected. Water flow should be blocked.",
                               style: TextStyle(
                                 color: !isConnected
-                                    ? Colors.grey.shade700
+                                    ? isDark
+                                        ? Colors.white60
+                                        : Colors.grey.shade700
                                     : isClean
-                                        ? Colors.green.shade800
-                                        : Colors.red.shade800,
+                                        ? isDark
+                                            ? Colors.greenAccent
+                                            : Colors.green.shade800
+                                        : isDark
+                                            ? Colors.redAccent
+                                            : Colors.red.shade800,
                                 fontWeight:
                                     FontWeight.w600,
                               ),
@@ -471,29 +498,35 @@ class _MonitoringScreenState extends State<MonitoringScreen> {
     required String value,
     required Color color,
   }) {
+    final bool isDark =
+        Theme.of(context).brightness == Brightness.dark;
+
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(20),
-
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: isDark
+            ? const Color(0xff1E293B)
+            : Colors.white,
         borderRadius: BorderRadius.circular(20),
-        boxShadow: const [
+        boxShadow: [
           BoxShadow(
-            color: Colors.black12,
+            color: Colors.black.withValues(
+              alpha: isDark ? 0.25 : 0.08,
+            ),
             blurRadius: 8,
-            offset: Offset(0, 4),
+            offset: const Offset(0, 4),
           ),
         ],
       ),
-
       child: Row(
         children: [
           Container(
             padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
-              color: color.withValues(alpha: 0.12),
-              borderRadius: BorderRadius.circular(15),
+              color: color.withValues(alpha: 0.15),
+              borderRadius:
+                  BorderRadius.circular(15),
             ),
             child: Icon(
               icon,
@@ -511,8 +544,10 @@ class _MonitoringScreenState extends State<MonitoringScreen> {
               children: [
                 Text(
                   title,
-                  style: const TextStyle(
-                    color: Colors.grey,
+                  style: TextStyle(
+                    color: isDark
+                        ? Colors.white60
+                        : Colors.grey,
                   ),
                 ),
                 const SizedBox(height: 4),

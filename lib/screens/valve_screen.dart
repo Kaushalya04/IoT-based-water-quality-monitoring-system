@@ -11,14 +11,17 @@ class ValveScreen extends StatefulWidget {
   const ValveScreen({super.key});
 
   @override
-  State<ValveScreen> createState() => _ValveScreenState();
+  State<ValveScreen> createState() =>
+      _ValveScreenState();
 }
 
 class _ValveScreenState extends State<ValveScreen> {
   late final FirebaseDatabase database;
 
   DatabaseReference? sensorRef;
-  StreamSubscription<DatabaseEvent>? sensorSubscription;
+
+  StreamSubscription<DatabaseEvent>?
+      sensorSubscription;
 
   double turbidity = 0;
 
@@ -46,13 +49,15 @@ class _ValveScreenState extends State<ValveScreen> {
   }
 
   void setupUserDatabase() {
-    final User? user = FirebaseAuth.instance.currentUser;
+    final User? user =
+        FirebaseAuth.instance.currentUser;
 
     if (user == null) {
       setState(() {
         isLoading = false;
         hasSensorData = false;
-        errorMessage = "No logged-in user found";
+        errorMessage =
+            "No logged-in user found";
       });
 
       return;
@@ -66,13 +71,16 @@ class _ValveScreenState extends State<ValveScreen> {
   }
 
   void listenSensor() {
-    sensorSubscription = sensorRef!.onValue.listen(
+    sensorSubscription =
+        sensorRef!.onValue.listen(
       (DatabaseEvent event) {
         if (!mounted) return;
 
-        final value = event.snapshot.value;
+        final value =
+            event.snapshot.value;
 
-        if (value == null || value is! Map) {
+        if (value == null ||
+            value is! Map) {
           setState(() {
             turbidity = 0;
             valve = "UNKNOWN";
@@ -90,14 +98,18 @@ class _ValveScreenState extends State<ValveScreen> {
         }
 
         final data =
-            Map<dynamic, dynamic>.from(value);
+            Map<dynamic, dynamic>.from(
+          value,
+        );
 
-        final rawTurbidity = data['turbidity'];
+        final rawTurbidity =
+            data['turbidity'];
 
         double newTurbidity = 0;
 
         if (rawTurbidity is num) {
-          newTurbidity = rawTurbidity.toDouble();
+          newTurbidity =
+              rawTurbidity.toDouble();
         } else {
           newTurbidity =
               double.tryParse(
@@ -110,7 +122,9 @@ class _ValveScreenState extends State<ValveScreen> {
           turbidity = newTurbidity;
 
           waterStatus =
-              turbidity < 300 ? "CLEAR" : "DIRTY";
+              turbidity < 300
+                  ? "CLEAR"
+                  : "DIRTY";
 
           valve =
               data['valve']
@@ -119,7 +133,8 @@ class _ValveScreenState extends State<ValveScreen> {
                   "UNKNOWN";
 
           manualOverride =
-              data['manualOverride'] == true;
+              data['manualOverride'] ==
+                  true;
 
           hasSensorData = true;
           isLoading = false;
@@ -132,14 +147,16 @@ class _ValveScreenState extends State<ValveScreen> {
         setState(() {
           isLoading = false;
           hasSensorData = false;
-          errorMessage = error.toString();
+          errorMessage =
+              error.toString();
         });
       },
     );
   }
 
   Future<void> openValve() async {
-    if (sensorRef == null || !hasSensorData) {
+    if (sensorRef == null ||
+        !hasSensorData) {
       return;
     }
 
@@ -155,20 +172,16 @@ class _ValveScreenState extends State<ValveScreen> {
 
       if (!mounted) return;
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text("Valve opened manually"),
-          backgroundColor: Colors.green,
-        ),
+      showMessage(
+        "Valve opened manually",
+        Colors.green,
       );
     } catch (e) {
       if (!mounted) return;
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text("Error: $e"),
-          backgroundColor: Colors.red,
-        ),
+      showMessage(
+        "Error: $e",
+        Colors.red,
       );
     } finally {
       if (mounted) {
@@ -180,7 +193,8 @@ class _ValveScreenState extends State<ValveScreen> {
   }
 
   Future<void> closeValve() async {
-    if (sensorRef == null || !hasSensorData) {
+    if (sensorRef == null ||
+        !hasSensorData) {
       return;
     }
 
@@ -196,20 +210,16 @@ class _ValveScreenState extends State<ValveScreen> {
 
       if (!mounted) return;
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text("Valve close command sent"),
-          backgroundColor: Colors.red,
-        ),
+      showMessage(
+        "Valve close command sent",
+        Colors.red,
       );
     } catch (e) {
       if (!mounted) return;
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text("Error: $e"),
-          backgroundColor: Colors.red,
-        ),
+      showMessage(
+        "Error: $e",
+        Colors.red,
       );
     } finally {
       if (mounted) {
@@ -220,9 +230,26 @@ class _ValveScreenState extends State<ValveScreen> {
     }
   }
 
-  bool get isClean => waterStatus == "CLEAR";
+  void showMessage(
+    String message,
+    Color color,
+  ) {
+    ScaffoldMessenger.of(context)
+        .showSnackBar(
+      SnackBar(
+        content: Text(message),
+        backgroundColor: color,
+        behavior:
+            SnackBarBehavior.floating,
+      ),
+    );
+  }
 
-  bool get valveOpen => valve == "OPEN";
+  bool get isClean =>
+      waterStatus == "CLEAR";
+
+  bool get valveOpen =>
+      valve == "OPEN";
 
   @override
   void dispose() {
@@ -232,27 +259,42 @@ class _ValveScreenState extends State<ValveScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final bool isDark =
+        Theme.of(context).brightness ==
+            Brightness.dark;
+
+    final Color backgroundColor =
+        isDark
+            ? const Color(0xff0F172A)
+            : const Color(0xffF4F9FC);
+
     if (isLoading) {
-      return const Scaffold(
-        backgroundColor: Color(0xffF4F9FC),
-        body: Center(
-          child: CircularProgressIndicator(),
+      return Scaffold(
+        backgroundColor:
+            backgroundColor,
+        body: const Center(
+          child:
+              CircularProgressIndicator(),
         ),
       );
     }
 
     return Scaffold(
-      backgroundColor: const Color(0xffF4F9FC),
+      backgroundColor:
+          backgroundColor,
 
       appBar: AppBar(
-        title: const Text("Valve Control"),
+        title:
+            const Text("Valve Control"),
         centerTitle: true,
       ),
 
       body: LayoutBuilder(
-        builder: (context, constraints) {
+        builder:
+            (context, constraints) {
           final bool isDesktop =
-              constraints.maxWidth >= 800;
+              constraints.maxWidth >=
+                  800;
 
           return SingleChildScrollView(
             padding: EdgeInsets.fromLTRB(
@@ -261,41 +303,61 @@ class _ValveScreenState extends State<ValveScreen> {
               isDesktop ? 35 : 20,
               120,
             ),
-
             child: Center(
               child: ConstrainedBox(
-                constraints: const BoxConstraints(
+                constraints:
+                    const BoxConstraints(
                   maxWidth: 900,
                 ),
-
                 child: Column(
                   children: [
-                    if (errorMessage != null)
+                    if (errorMessage !=
+                        null)
                       Container(
-                        width: double.infinity,
-                        padding: const EdgeInsets.all(16),
+                        width:
+                            double.infinity,
+                        padding:
+                            const EdgeInsets.all(
+                          16,
+                        ),
                         margin:
-                            const EdgeInsets.only(bottom: 20),
-                        decoration: BoxDecoration(
-                          color: Colors.orange.shade50,
+                            const EdgeInsets.only(
+                          bottom: 20,
+                        ),
+                        decoration:
+                            BoxDecoration(
+                          color: isDark
+                              ? const Color(
+                                  0xff3B2F1B,
+                                )
+                              : Colors
+                                  .orange
+                                  .shade50,
                           borderRadius:
-                              BorderRadius.circular(16),
+                              BorderRadius
+                                  .circular(16),
                         ),
                         child: Row(
                           children: [
                             const Icon(
-                              Icons.info_outline,
-                              color: Colors.orange,
+                              Icons
+                                  .info_outline,
+                              color:
+                                  Colors.orange,
                             ),
-                            const SizedBox(width: 10),
+                            const SizedBox(
+                              width: 10,
+                            ),
                             Expanded(
                               child: Text(
                                 errorMessage!,
-                                style: TextStyle(
+                                style:
+                                    const TextStyle(
                                   color:
-                                      Colors.orange.shade900,
+                                      Colors.orange,
                                   fontWeight:
-                                      FontWeight.w600,
+                                      FontWeight
+                                          .w600,
                                 ),
                               ),
                             ),
@@ -303,73 +365,114 @@ class _ValveScreenState extends State<ValveScreen> {
                         ),
                       ),
 
-                    // Main valve card
                     Container(
-                      width: double.infinity,
-                      padding: const EdgeInsets.all(30),
-                      decoration: BoxDecoration(
-                        gradient: LinearGradient(
-                          colors: !hasSensorData
-                              ? const [
-                                  Colors.grey,
-                                  Colors.blueGrey,
-                                ]
-                              : valveOpen
+                      width:
+                          double.infinity,
+                      padding:
+                          const EdgeInsets.all(
+                        30,
+                      ),
+                      decoration:
+                          BoxDecoration(
+                        gradient:
+                            LinearGradient(
+                          colors:
+                              !hasSensorData
                                   ? const [
-                                      Color(0xff059669),
-                                      Color(0xff34D399),
+                                      Color(
+                                        0xff475569,
+                                      ),
+                                      Color(
+                                        0xff64748B,
+                                      ),
                                     ]
-                                  : const [
-                                      Color(0xffDC2626),
-                                      Color(0xffFB7185),
-                                    ],
+                                  : valveOpen
+                                      ? const [
+                                          Color(
+                                            0xff059669,
+                                          ),
+                                          Color(
+                                            0xff34D399,
+                                          ),
+                                        ]
+                                      : const [
+                                          Color(
+                                            0xffDC2626,
+                                          ),
+                                          Color(
+                                            0xffFB7185,
+                                          ),
+                                        ],
                         ),
                         borderRadius:
-                            BorderRadius.circular(28),
+                            BorderRadius.circular(
+                          28,
+                        ),
                       ),
                       child: Column(
                         children: [
                           Container(
                             padding:
-                                const EdgeInsets.all(18),
-                            decoration: BoxDecoration(
-                              color: Colors.white
-                                  .withValues(alpha: 0.20),
-                              shape: BoxShape.circle,
+                                const EdgeInsets
+                                    .all(18),
+                            decoration:
+                                BoxDecoration(
+                              color: Colors
+                                  .white
+                                  .withValues(
+                                alpha: 0.20,
+                              ),
+                              shape:
+                                  BoxShape.circle,
                             ),
                             child: Icon(
                               !hasSensorData
-                                  ? Icons.sensors_off
+                                  ? Icons
+                                      .sensors_off
                                   : valveOpen
-                                      ? Icons.water_drop
-                                      : Icons.block,
+                                      ? Icons
+                                          .water_drop
+                                      : Icons
+                                          .block,
                               size: 60,
-                              color: Colors.white,
+                              color:
+                                  Colors.white,
                             ),
                           ),
 
-                          const SizedBox(height: 18),
+                          const SizedBox(
+                            height: 18,
+                          ),
 
                           const Text(
                             "SOLENOID VALVE",
                             style: TextStyle(
-                              color: Colors.white70,
-                              fontWeight: FontWeight.w600,
+                              color:
+                                  Colors.white70,
+                              fontWeight:
+                                  FontWeight.w600,
                             ),
                           ),
 
-                          const SizedBox(height: 5),
+                          const SizedBox(
+                            height: 5,
+                          ),
 
                           Text(
                             valve,
-                            style: const TextStyle(
-                              color: Colors.white,
+                            style:
+                                const TextStyle(
+                              color:
+                                  Colors.white,
                               fontSize: 38,
-                              fontWeight: FontWeight.bold,
+                              fontWeight:
+                                  FontWeight.bold,
                             ),
                           ),
 
-                          const SizedBox(height: 8),
+                          const SizedBox(
+                            height: 8,
+                          ),
 
                           Text(
                             !hasSensorData
@@ -377,15 +480,19 @@ class _ValveScreenState extends State<ValveScreen> {
                                 : valveOpen
                                     ? "Water flow is enabled"
                                     : "Water flow is blocked",
-                            style: const TextStyle(
-                              color: Colors.white,
+                            style:
+                                const TextStyle(
+                              color:
+                                  Colors.white,
                             ),
                           ),
                         ],
                       ),
                     ),
 
-                    const SizedBox(height: 20),
+                    const SizedBox(
+                      height: 20,
+                    ),
 
                     if (isDesktop)
                       Row(
@@ -393,36 +500,49 @@ class _ValveScreenState extends State<ValveScreen> {
                           Expanded(
                             child: statusCard(
                               icon: !hasSensorData
-                                  ? Icons.help_outline
+                                  ? Icons
+                                      .help_outline
                                   : isClean
-                                      ? Icons.check_circle
-                                      : Icons.warning_rounded,
-                              title: "Water Quality",
-                              value: hasSensorData
-                                  ? waterStatus
-                                  : "UNKNOWN",
-                              color: !hasSensorData
-                                  ? Colors.grey
-                                  : isClean
-                                      ? Colors.green
-                                      : Colors.red,
+                                      ? Icons
+                                          .check_circle
+                                      : Icons
+                                          .warning_rounded,
+                              title:
+                                  "Water Quality",
+                              value:
+                                  hasSensorData
+                                      ? waterStatus
+                                      : "UNKNOWN",
+                              color:
+                                  !hasSensorData
+                                      ? Colors.grey
+                                      : isClean
+                                          ? Colors
+                                              .green
+                                          : Colors
+                                              .red,
                             ),
                           ),
-
-                          const SizedBox(width: 20),
-
+                          const SizedBox(
+                            width: 20,
+                          ),
                           Expanded(
                             child: statusCard(
                               icon: Icons.speed,
-                              title: "Turbidity",
-                              value: hasSensorData
-                                  ? "${turbidity.toInt()} NTU"
-                                  : "--",
-                              color: !hasSensorData
-                                  ? Colors.grey
-                                  : isClean
-                                      ? AppColors.primary
-                                      : Colors.red,
+                              title:
+                                  "Turbidity",
+                              value:
+                                  hasSensorData
+                                      ? "${turbidity.toInt()} NTU"
+                                      : "--",
+                              color:
+                                  !hasSensorData
+                                      ? Colors.grey
+                                      : isClean
+                                          ? AppColors
+                                              .primary
+                                          : Colors
+                                              .red,
                             ),
                           ),
                         ],
@@ -430,70 +550,114 @@ class _ValveScreenState extends State<ValveScreen> {
                     else ...[
                       statusCard(
                         icon: !hasSensorData
-                            ? Icons.help_outline
+                            ? Icons
+                                .help_outline
                             : isClean
-                                ? Icons.check_circle
-                                : Icons.warning_rounded,
-                        title: "Water Quality",
-                        value: hasSensorData
-                            ? waterStatus
-                            : "UNKNOWN",
-                        color: !hasSensorData
-                            ? Colors.grey
-                            : isClean
-                                ? Colors.green
-                                : Colors.red,
+                                ? Icons
+                                    .check_circle
+                                : Icons
+                                    .warning_rounded,
+                        title:
+                            "Water Quality",
+                        value:
+                            hasSensorData
+                                ? waterStatus
+                                : "UNKNOWN",
+                        color:
+                            !hasSensorData
+                                ? Colors.grey
+                                : isClean
+                                    ? Colors.green
+                                    : Colors.red,
                       ),
 
-                      const SizedBox(height: 20),
+                      const SizedBox(
+                        height: 20,
+                      ),
 
                       statusCard(
                         icon: Icons.speed,
                         title: "Turbidity",
-                        value: hasSensorData
-                            ? "${turbidity.toInt()} NTU"
-                            : "--",
-                        color: !hasSensorData
-                            ? Colors.grey
-                            : isClean
-                                ? AppColors.primary
-                                : Colors.red,
+                        value:
+                            hasSensorData
+                                ? "${turbidity.toInt()} NTU"
+                                : "--",
+                        color:
+                            !hasSensorData
+                                ? Colors.grey
+                                : isClean
+                                    ? AppColors
+                                        .primary
+                                    : Colors.red,
                       ),
                     ],
 
-                    const SizedBox(height: 20),
+                    const SizedBox(
+                      height: 20,
+                    ),
 
                     Container(
-                      width: double.infinity,
-                      padding: const EdgeInsets.all(20),
-                      decoration: BoxDecoration(
+                      width:
+                          double.infinity,
+                      padding:
+                          const EdgeInsets.all(
+                        20,
+                      ),
+                      decoration:
+                          BoxDecoration(
                         color: !hasSensorData
-                            ? Colors.grey.shade100
+                            ? isDark
+                                ? const Color(
+                                    0xff1E293B,
+                                  )
+                                : Colors.grey
+                                    .shade100
                             : isClean
-                                ? Colors.blue.shade50
-                                : Colors.orange.shade50,
+                                ? isDark
+                                    ? const Color(
+                                        0xff172554,
+                                      )
+                                    : Colors.blue
+                                        .shade50
+                                : isDark
+                                    ? const Color(
+                                        0xff431407,
+                                      )
+                                    : Colors.orange
+                                        .shade50,
                         borderRadius:
-                            BorderRadius.circular(20),
+                            BorderRadius.circular(
+                          20,
+                        ),
                       ),
                       child: Row(
                         crossAxisAlignment:
-                            CrossAxisAlignment.start,
+                            CrossAxisAlignment
+                                .start,
                         children: [
                           Icon(
                             !hasSensorData
-                                ? Icons.info_outline
+                                ? Icons
+                                    .info_outline
                                 : isClean
-                                    ? Icons.info_outline
-                                    : Icons.warning_amber_rounded,
+                                    ? Icons
+                                        .info_outline
+                                    : Icons
+                                        .warning_amber_rounded,
                             size: 35,
-                            color: !hasSensorData
-                                ? Colors.grey
-                                : isClean
-                                    ? AppColors.primary
-                                    : Colors.orange,
+                            color:
+                                !hasSensorData
+                                    ? Colors.grey
+                                    : isClean
+                                        ? AppColors
+                                            .primary
+                                        : Colors
+                                            .orange,
                           ),
 
-                          const SizedBox(width: 15),
+                          const SizedBox(
+                            width: 15,
+                          ),
 
                           Expanded(
                             child: Text(
@@ -506,13 +670,15 @@ class _ValveScreenState extends State<ValveScreen> {
                                           : "Dirty water detected. The valve is automatically closed for safety.",
                               style: TextStyle(
                                 fontWeight:
-                                    FontWeight.w600,
+                                    FontWeight
+                                        .w600,
                                 height: 1.5,
-                                color: !hasSensorData
-                                    ? Colors.grey.shade700
-                                    : isClean
-                                        ? Colors.blue.shade900
-                                        : Colors.orange.shade900,
+                                color:
+                                    isDark
+                                        ? Colors
+                                            .white70
+                                        : Colors
+                                            .black87,
                               ),
                             ),
                           ),
@@ -520,14 +686,19 @@ class _ValveScreenState extends State<ValveScreen> {
                       ),
                     ),
 
-                    const SizedBox(height: 25),
+                    const SizedBox(
+                      height: 25,
+                    ),
 
                     SizedBox(
-                      width: double.infinity,
+                      width:
+                          double.infinity,
                       height: 58,
-                      child: ElevatedButton.icon(
+                      child:
+                          ElevatedButton.icon(
                         onPressed:
-                            isUpdating || !hasSensorData
+                            isUpdating ||
+                                    !hasSensorData
                                 ? null
                                 : openValve,
                         icon: isUpdating
@@ -537,57 +708,80 @@ class _ValveScreenState extends State<ValveScreen> {
                                 child:
                                     CircularProgressIndicator(
                                   strokeWidth: 2,
-                                  color: Colors.white,
+                                  color:
+                                      Colors.white,
                                 ),
                               )
                             : const Icon(
-                                Icons.restart_alt,
+                                Icons
+                                    .restart_alt,
                               ),
                         label: Text(
                           isUpdating
                               ? "UPDATING..."
                               : "RESET / OPEN VALVE",
-                          style: const TextStyle(
-                            fontWeight: FontWeight.bold,
+                          style:
+                              const TextStyle(
+                            fontWeight:
+                                FontWeight.bold,
                           ),
                         ),
-                        style: ElevatedButton.styleFrom(
+                        style:
+                            ElevatedButton
+                                .styleFrom(
                           backgroundColor:
                               AppColors.primary,
-                          foregroundColor: Colors.white,
-                          shape: RoundedRectangleBorder(
+                          foregroundColor:
+                              Colors.white,
+                          shape:
+                              RoundedRectangleBorder(
                             borderRadius:
-                                BorderRadius.circular(16),
+                                BorderRadius
+                                    .circular(16),
                           ),
                         ),
                       ),
                     ),
 
-                    const SizedBox(height: 15),
+                    const SizedBox(
+                      height: 15,
+                    ),
 
                     SizedBox(
-                      width: double.infinity,
+                      width:
+                          double.infinity,
                       height: 58,
-                      child: OutlinedButton.icon(
+                      child:
+                          OutlinedButton.icon(
                         onPressed:
-                            isUpdating || !hasSensorData
+                            isUpdating ||
+                                    !hasSensorData
                                 ? null
                                 : closeValve,
-                        icon: const Icon(Icons.block),
+                        icon: const Icon(
+                          Icons.block,
+                        ),
                         label: const Text(
                           "CLOSE VALVE",
                           style: TextStyle(
-                            fontWeight: FontWeight.bold,
+                            fontWeight:
+                                FontWeight.bold,
                           ),
                         ),
-                        style: OutlinedButton.styleFrom(
-                          foregroundColor: Colors.red,
-                          side: const BorderSide(
+                        style:
+                            OutlinedButton
+                                .styleFrom(
+                          foregroundColor:
+                              Colors.red,
+                          side:
+                              const BorderSide(
                             color: Colors.red,
                           ),
-                          shape: RoundedRectangleBorder(
+                          shape:
+                              RoundedRectangleBorder(
                             borderRadius:
-                                BorderRadius.circular(16),
+                                BorderRadius
+                                    .circular(16),
                           ),
                         ),
                       ),
@@ -608,27 +802,45 @@ class _ValveScreenState extends State<ValveScreen> {
     required String value,
     required Color color,
   }) {
+    final bool isDark =
+        Theme.of(context).brightness ==
+            Brightness.dark;
+
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.all(20),
+      padding:
+          const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(20),
-        boxShadow: const [
+        color: isDark
+            ? const Color(0xff1E293B)
+            : Colors.white,
+        borderRadius:
+            BorderRadius.circular(20),
+        boxShadow: [
           BoxShadow(
-            color: Colors.black12,
+            color: Colors.black.withValues(
+              alpha:
+                  isDark ? 0.25 : 0.08,
+            ),
             blurRadius: 8,
-            offset: Offset(0, 4),
+            offset:
+                const Offset(0, 4),
           ),
         ],
       ),
       child: Row(
         children: [
           Container(
-            padding: const EdgeInsets.all(12),
+            padding:
+                const EdgeInsets.all(12),
             decoration: BoxDecoration(
-              color: color.withValues(alpha: 0.12),
-              borderRadius: BorderRadius.circular(15),
+              color: color.withValues(
+                alpha: 0.15,
+              ),
+              borderRadius:
+                  BorderRadius.circular(
+                15,
+              ),
             ),
             child: Icon(
               icon,
@@ -636,7 +848,9 @@ class _ValveScreenState extends State<ValveScreen> {
               size: 34,
             ),
           ),
+
           const SizedBox(width: 15),
+
           Expanded(
             child: Column(
               crossAxisAlignment:
@@ -644,17 +858,24 @@ class _ValveScreenState extends State<ValveScreen> {
               children: [
                 Text(
                   title,
-                  style: const TextStyle(
-                    color: Colors.grey,
+                  style: TextStyle(
+                    color: isDark
+                        ? Colors.white60
+                        : Colors.grey,
                   ),
                 ),
-                const SizedBox(height: 5),
+
+                const SizedBox(
+                  height: 5,
+                ),
+
                 Text(
                   value,
                   style: TextStyle(
                     color: color,
                     fontSize: 19,
-                    fontWeight: FontWeight.bold,
+                    fontWeight:
+                        FontWeight.bold,
                   ),
                 ),
               ],

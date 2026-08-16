@@ -6,6 +6,7 @@ import 'firebase_options.dart';
 import 'utils/app_theme.dart';
 import 'screens/splash_screen.dart';
 import 'services/history_service.dart';
+import 'services/theme_service.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -14,25 +15,45 @@ Future<void> main() async {
     options: DefaultFirebaseOptions.currentPlatform,
   );
 
-  // Run automatic water quality + valve logic only on Android/mobile.
-  // This prevents duplicate history when Web and Mobile are open together.
+  await ThemeService.loadTheme();
+
   if (!kIsWeb) {
     HistoryService.start();
   }
 
-  runApp(const WaterQualityApp());
+  runApp(
+    const WaterQualityApp(),
+  );
 }
 
 class WaterQualityApp extends StatelessWidget {
-  const WaterQualityApp({super.key});
+  const WaterQualityApp({
+    super.key,
+  });
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      debugShowCheckedModeBanner: false,
-      title: 'Water Quality Monitoring',
-      theme: AppTheme.lightTheme,
-      home: const SplashScreen(),
+    return ValueListenableBuilder<ThemeMode>(
+      valueListenable: ThemeService.themeMode,
+      builder: (
+        context,
+        themeMode,
+        child,
+      ) {
+        return MaterialApp(
+          debugShowCheckedModeBanner: false,
+
+          title: 'Water Quality Monitoring',
+
+          theme: AppTheme.lightTheme,
+
+          darkTheme: AppTheme.darkTheme,
+
+          themeMode: themeMode,
+
+          home: const SplashScreen(),
+        );
+      },
     );
   }
 }

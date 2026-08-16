@@ -31,171 +31,163 @@ class _RegisterScreenState extends State<RegisterScreen> {
   bool obscureConfirmPassword = true;
   bool isLoading = false;
 
-  Future<void> registerUser() async {
-    final String name =
-        nameController.text.trim();
+ Future<void> registerUser() async {
+  final String name = nameController.text.trim();
+  final String email = emailController.text.trim();
+  final String password = passwordController.text.trim();
+  final String confirmPassword =
+      confirmPasswordController.text.trim();
 
-    final String email =
-        emailController.text.trim();
-
-    final String password =
-        passwordController.text.trim();
-
-    final String confirmPassword =
-        confirmPasswordController.text.trim();
-
-    if (name.isEmpty ||
-        email.isEmpty ||
-        password.isEmpty ||
-        confirmPassword.isEmpty) {
-      showMessage(
-        "Please fill all fields",
-        Colors.orange,
-      );
-      return;
-    }
-
-    if (password.length < 6) {
-      showMessage(
-        "Password must contain at least 6 characters",
-        Colors.orange,
-      );
-      return;
-    }
-
-    if (password != confirmPassword) {
-      showMessage(
-        "Passwords do not match",
-        Colors.orange,
-      );
-      return;
-    }
-
-    try {
-      setState(() {
-        isLoading = true;
-      });
-
-      final UserCredential credential =
-          await FirebaseAuth.instance
-              .createUserWithEmailAndPassword(
-        email: email,
-        password: password,
-      );
-
-      final User? user = credential.user;
-
-      if (user == null) {
-        throw Exception(
-          "User account could not be created",
-        );
-      }
-
-      await user.updateDisplayName(name);
-
-      final FirebaseDatabase database =
-          FirebaseDatabase.instanceFor(
-        app: Firebase.app(),
-        databaseURL:
-            'https://water-quality-monitoring-94502-default-rtdb.asia-southeast1.firebasedatabase.app/',
-      );
-
-      final DatabaseReference userRef =
-          database.ref(
-        'users/${user.uid}',
-      );
-
-      await userRef.update({
-        'profile/name': name,
-        'profile/email': email,
-        'profile/uid': user.uid,
-        'profile/createdAt':
-            DateTime.now().millisecondsSinceEpoch,
-
-        'sensor/turbidity': 0,
-        'sensor/valve': 'UNKNOWN',
-        'sensor/waterStatus': 'UNKNOWN',
-        'sensor/deviceStatus': 'OFFLINE',
-        'sensor/manualOverride': false,
-      });
-
-      await FirebaseAuth.instance.signOut();
-
-      if (!mounted) return;
-
-      showMessage(
-        "Account created successfully",
-        Colors.green,
-      );
-
-      await Future.delayed(
-        const Duration(milliseconds: 500),
-      );
-
-      if (!mounted) return;
-
-      Navigator.pop(context);
-    } on FirebaseAuthException catch (e) {
-      String message;
-
-      switch (e.code) {
-        case "email-already-in-use":
-          message =
-              "This email is already registered";
-          break;
-
-        case "invalid-email":
-          message =
-              "Invalid email address";
-          break;
-
-        case "weak-password":
-          message =
-              "Password is too weak";
-          break;
-
-        case "operation-not-allowed":
-          message =
-              "Email/Password registration is not enabled";
-          break;
-
-        case "too-many-requests":
-          message =
-              "Too many attempts. Try again later";
-          break;
-
-        case "network-request-failed":
-          message =
-              "Please check your internet connection";
-          break;
-
-        default:
-          message =
-              "${e.code}: ${e.message ?? 'Registration failed'}";
-      }
-
-      if (!mounted) return;
-
-      showMessage(
-        message,
-        Colors.red,
-      );
-    } catch (e) {
-      if (!mounted) return;
-
-      showMessage(
-        "Registration failed: $e",
-        Colors.red,
-      );
-    } finally {
-      if (mounted) {
-        setState(() {
-          isLoading = false;
-        });
-      }
-    }
+  if (name.isEmpty ||
+      email.isEmpty ||
+      password.isEmpty ||
+      confirmPassword.isEmpty) {
+    showMessage(
+      "Please fill all fields",
+      Colors.orange,
+    );
+    return;
   }
 
+  if (password.length < 6) {
+    showMessage(
+      "Password must contain at least 6 characters",
+      Colors.orange,
+    );
+    return;
+  }
+
+  if (password != confirmPassword) {
+    showMessage(
+      "Passwords do not match",
+      Colors.orange,
+    );
+    return;
+  }
+
+  try {
+    setState(() {
+      isLoading = true;
+    });
+
+    // Create Firebase Authentication user
+    final UserCredential credential =
+        await FirebaseAuth.instance
+            .createUserWithEmailAndPassword(
+      email: email,
+      password: password,
+    );
+
+    final User? user = credential.user;
+
+    if (user == null) {
+      throw Exception(
+        "User account could not be created",
+      );
+    }
+
+    // Save name in Firebase Authentication
+    await user.updateDisplayName(name);
+
+    // Connect to Firebase Realtime Database
+    final FirebaseDatabase database =
+        FirebaseDatabase.instanceFor(
+      app: Firebase.app(),
+      databaseURL:
+          'https://water-quality-monitoring-94502-default-rtdb.asia-southeast1.firebasedatabase.app/',
+    );
+
+    // Save PROFILE ONLY
+    final DatabaseReference profileRef =
+        database.ref(
+      'users/${user.uid}/profile',
+    );
+
+    await profileRef.set({
+      'uid': user.uid,
+      'name': name,
+      'email': email,
+      'createdAt':
+          DateTime.now().millisecondsSinceEpoch,
+    });
+
+    // User must login after registration
+    await FirebaseAuth.instance.signOut();
+
+    if (!mounted) return;
+
+    showMessage(
+      "Account created successfully",
+      Colors.green,
+    );
+
+    await Future.delayed(
+      const Duration(milliseconds: 500),
+    );
+
+    if (!mounted) return;
+
+    Navigator.pop(context);
+  } on FirebaseAuthException catch (e) {
+    String message;
+
+    switch (e.code) {
+      case "email-already-in-use":
+        message =
+            "This email is already registered";
+        break;
+
+      case "invalid-email":
+        message =
+            "Invalid email address";
+        break;
+
+      case "weak-password":
+        message =
+            "Password is too weak";
+        break;
+
+      case "operation-not-allowed":
+        message =
+            "Email/Password registration is not enabled";
+        break;
+
+      case "too-many-requests":
+        message =
+            "Too many attempts. Try again later";
+        break;
+
+      case "network-request-failed":
+        message =
+            "Please check your internet connection";
+        break;
+
+      default:
+        message =
+            "${e.code}: ${e.message ?? 'Registration failed'}";
+    }
+
+    if (!mounted) return;
+
+    showMessage(
+      message,
+      Colors.red,
+    );
+  } catch (e) {
+    if (!mounted) return;
+
+    showMessage(
+      "Registration failed: $e",
+      Colors.red,
+    );
+  } finally {
+    if (mounted) {
+      setState(() {
+        isLoading = false;
+      });
+    }
+  }
+}
   void showMessage(
     String message,
     Color color,

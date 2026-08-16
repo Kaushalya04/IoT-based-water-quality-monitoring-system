@@ -11,14 +11,18 @@ class ReportsScreen extends StatefulWidget {
   const ReportsScreen({super.key});
 
   @override
-  State<ReportsScreen> createState() => _ReportsScreenState();
+  State<ReportsScreen> createState() =>
+      _ReportsScreenState();
 }
 
-class _ReportsScreenState extends State<ReportsScreen> {
+class _ReportsScreenState
+    extends State<ReportsScreen> {
   late final FirebaseDatabase database;
 
   DatabaseReference? historyRef;
-  StreamSubscription<DatabaseEvent>? historySubscription;
+
+  StreamSubscription<DatabaseEvent>?
+      historySubscription;
 
   bool isLoading = true;
   String? errorMessage;
@@ -45,14 +49,15 @@ class _ReportsScreenState extends State<ReportsScreen> {
   }
 
   void setupUserReports() {
-    final User? user = FirebaseAuth.instance.currentUser;
+    final User? user =
+        FirebaseAuth.instance.currentUser;
 
     if (user == null) {
       setState(() {
         isLoading = false;
-        errorMessage = "No logged-in user found";
+        errorMessage =
+            "No logged-in user found";
       });
-
       return;
     }
 
@@ -64,11 +69,13 @@ class _ReportsScreenState extends State<ReportsScreen> {
   }
 
   void listenReports() {
-    historySubscription = historyRef!.onValue.listen(
+    historySubscription =
+        historyRef!.onValue.listen(
       (DatabaseEvent event) {
         if (!mounted) return;
 
-        final value = event.snapshot.value;
+        final value =
+            event.snapshot.value;
 
         if (value is! Map) {
           setState(() {
@@ -81,11 +88,13 @@ class _ReportsScreenState extends State<ReportsScreen> {
             isLoading = false;
             errorMessage = null;
           });
-
           return;
         }
 
-        final data = Map<dynamic, dynamic>.from(value);
+        final data =
+            Map<dynamic, dynamic>.from(
+          value,
+        );
 
         int total = 0;
         int clear = 0;
@@ -98,7 +107,9 @@ class _ReportsScreenState extends State<ReportsScreen> {
         data.forEach((key, value) {
           if (value is Map) {
             final item =
-                Map<dynamic, dynamic>.from(value);
+                Map<dynamic, dynamic>.from(
+              value,
+            );
 
             final String status =
                 item['waterStatus']
@@ -113,7 +124,9 @@ class _ReportsScreenState extends State<ReportsScreen> {
                     'UNKNOWN';
 
             final double turbidity =
-                _toDouble(item['turbidity']);
+                _toDouble(
+              item['turbidity'],
+            );
 
             total++;
             turbidityTotal += turbidity;
@@ -144,7 +157,9 @@ class _ReportsScreenState extends State<ReportsScreen> {
           valveClosedCount = closed;
 
           averageTurbidity =
-              total == 0 ? 0 : turbidityTotal / total;
+              total == 0
+                  ? 0
+                  : turbidityTotal / total;
 
           isLoading = false;
           errorMessage = null;
@@ -192,8 +207,17 @@ class _ReportsScreenState extends State<ReportsScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final bool isDark =
+        Theme.of(context).brightness ==
+            Brightness.dark;
+
+    final Color backgroundColor =
+        isDark
+            ? const Color(0xff0F172A)
+            : const Color(0xffF4F9FC);
+
     return Scaffold(
-      backgroundColor: const Color(0xffF4F9FC),
+      backgroundColor: backgroundColor,
 
       appBar: AppBar(
         title: const Text("Reports"),
@@ -202,62 +226,84 @@ class _ReportsScreenState extends State<ReportsScreen> {
 
       body: isLoading
           ? const Center(
-              child: CircularProgressIndicator(),
+              child:
+                  CircularProgressIndicator(),
             )
           : errorMessage != null
               ? Center(
                   child: Padding(
-                    padding: const EdgeInsets.all(20),
+                    padding:
+                        const EdgeInsets.all(
+                      20,
+                    ),
                     child: Text(
                       errorMessage!,
-                      textAlign: TextAlign.center,
-                      style: const TextStyle(
+                      textAlign:
+                          TextAlign.center,
+                      style:
+                          const TextStyle(
                         color: Colors.red,
                       ),
                     ),
                   ),
                 )
               : LayoutBuilder(
-                  builder: (context, constraints) {
+                  builder:
+                      (context, constraints) {
                     final bool desktop =
-                        constraints.maxWidth >= 850;
+                        constraints.maxWidth >=
+                            850;
 
                     return SingleChildScrollView(
-                      padding: EdgeInsets.fromLTRB(
+                      padding:
+                          EdgeInsets.fromLTRB(
                         desktop ? 35 : 18,
                         20,
                         desktop ? 35 : 18,
                         120,
                       ),
                       child: Center(
-                        child: ConstrainedBox(
+                        child:
+                            ConstrainedBox(
                           constraints:
                               const BoxConstraints(
                             maxWidth: 1100,
                           ),
                           child: Column(
                             crossAxisAlignment:
-                                CrossAxisAlignment.start,
+                                CrossAxisAlignment
+                                    .start,
                             children: [
-                              const Text(
+                              Text(
                                 "Water Quality Summary",
                                 style: TextStyle(
                                   fontSize: 26,
                                   fontWeight:
                                       FontWeight.bold,
+                                  color: isDark
+                                      ? Colors.white
+                                      : const Color(
+                                          0xff0F172A,
+                                        ),
                                 ),
                               ),
 
-                              const SizedBox(height: 5),
+                              const SizedBox(
+                                height: 5,
+                              ),
 
-                              const Text(
+                              Text(
                                 "Calculated using this user's history data",
                                 style: TextStyle(
-                                  color: Colors.grey,
+                                  color: isDark
+                                      ? Colors.white60
+                                      : Colors.grey,
                                 ),
                               ),
 
-                              const SizedBox(height: 25),
+                              const SizedBox(
+                                height: 25,
+                              ),
 
                               GridView.count(
                                 shrinkWrap: true,
@@ -265,24 +311,33 @@ class _ReportsScreenState extends State<ReportsScreen> {
                                     const NeverScrollableScrollPhysics(),
                                 crossAxisCount:
                                     desktop ? 3 : 2,
-                                crossAxisSpacing: 15,
-                                mainAxisSpacing: 15,
+                                crossAxisSpacing:
+                                    15,
+                                mainAxisSpacing:
+                                    15,
                                 childAspectRatio:
-                                    desktop ? 1.7 : 1.25,
+                                    desktop
+                                        ? 1.7
+                                        : 1.25,
                                 children: [
                                   reportCard(
-                                    icon: Icons.history,
-                                    title: "Total Events",
-                                    value: "$totalEvents",
+                                    icon:
+                                        Icons.history,
+                                    title:
+                                        "Total Events",
+                                    value:
+                                        "$totalEvents",
                                     color:
                                         AppColors.primary,
                                   ),
 
                                   reportCard(
-                                    icon:
-                                        Icons.check_circle,
-                                    title: "Clear Water",
-                                    value: "$clearCount",
+                                    icon: Icons
+                                        .check_circle,
+                                    title:
+                                        "Clear Water",
+                                    value:
+                                        "$clearCount",
                                     color:
                                         Colors.green,
                                   ),
@@ -290,15 +345,19 @@ class _ReportsScreenState extends State<ReportsScreen> {
                                   reportCard(
                                     icon: Icons
                                         .warning_rounded,
-                                    title: "Dirty Water",
-                                    value: "$dirtyCount",
-                                    color: Colors.red,
+                                    title:
+                                        "Dirty Water",
+                                    value:
+                                        "$dirtyCount",
+                                    color:
+                                        Colors.red,
                                   ),
 
                                   reportCard(
-                                    icon:
-                                        Icons.water_drop,
-                                    title: "Valve Open",
+                                    icon: Icons
+                                        .water_drop,
+                                    title:
+                                        "Valve Open",
                                     value:
                                         "$valveOpenCount",
                                     color:
@@ -306,16 +365,19 @@ class _ReportsScreenState extends State<ReportsScreen> {
                                   ),
 
                                   reportCard(
-                                    icon: Icons.block,
+                                    icon:
+                                        Icons.block,
                                     title:
                                         "Valve Closed",
                                     value:
                                         "$valveClosedCount",
-                                    color: Colors.red,
+                                    color:
+                                        Colors.red,
                                   ),
 
                                   reportCard(
-                                    icon: Icons.speed,
+                                    icon:
+                                        Icons.speed,
                                     title:
                                         "Avg Turbidity",
                                     value:
@@ -326,27 +388,43 @@ class _ReportsScreenState extends State<ReportsScreen> {
                                 ],
                               ),
 
-                              const SizedBox(height: 25),
+                              const SizedBox(
+                                height: 25,
+                              ),
 
                               Container(
-                                width: double.infinity,
+                                width:
+                                    double.infinity,
                                 padding:
-                                    const EdgeInsets.all(
-                                  24,
-                                ),
-                                decoration: BoxDecoration(
-                                  color: Colors.white,
+                                    const EdgeInsets
+                                        .all(24),
+                                decoration:
+                                    BoxDecoration(
+                                  color: isDark
+                                      ? const Color(
+                                          0xff1E293B,
+                                        )
+                                      : Colors.white,
                                   borderRadius:
-                                      BorderRadius.circular(
-                                    22,
-                                  ),
-                                  boxShadow: const [
+                                      BorderRadius
+                                          .circular(22),
+                                  boxShadow: [
                                     BoxShadow(
-                                      color:
-                                          Colors.black12,
-                                      blurRadius: 8,
+                                      color: Colors
+                                          .black
+                                          .withValues(
+                                        alpha:
+                                            isDark
+                                                ? 0.25
+                                                : 0.08,
+                                      ),
+                                      blurRadius:
+                                          8,
                                       offset:
-                                          Offset(0, 4),
+                                          const Offset(
+                                        0,
+                                        4,
+                                      ),
                                     ),
                                   ],
                                 ),
@@ -355,12 +433,19 @@ class _ReportsScreenState extends State<ReportsScreen> {
                                       CrossAxisAlignment
                                           .start,
                                   children: [
-                                    const Text(
+                                    Text(
                                       "Water Quality Distribution",
-                                      style: TextStyle(
+                                      style:
+                                          TextStyle(
                                         fontSize: 19,
                                         fontWeight:
-                                            FontWeight.bold,
+                                            FontWeight
+                                                .bold,
+                                        color: isDark
+                                            ? Colors
+                                                .white
+                                            : Colors
+                                                .black87,
                                       ),
                                     ),
 
@@ -386,41 +471,59 @@ class _ReportsScreenState extends State<ReportsScreen> {
                                           "Dirty Water",
                                       percentage:
                                           dirtyPercentage,
-                                      color: Colors.red,
+                                      color:
+                                          Colors.red,
                                     ),
                                   ],
                                 ),
                               ),
 
-                              const SizedBox(height: 25),
+                              const SizedBox(
+                                height: 25,
+                              ),
 
                               Container(
-                                width: double.infinity,
+                                width:
+                                    double.infinity,
                                 padding:
-                                    const EdgeInsets.all(
-                                  20,
-                                ),
-                                decoration: BoxDecoration(
-                                  color: totalEvents == 0
-                                      ? Colors
-                                          .grey.shade100
+                                    const EdgeInsets
+                                        .all(20),
+                                decoration:
+                                    BoxDecoration(
+                                  color: totalEvents ==
+                                          0
+                                      ? isDark
+                                          ? const Color(
+                                              0xff1E293B,
+                                            )
+                                          : Colors
+                                              .grey
+                                              .shade100
                                       : clearPercentage >=
                                               dirtyPercentage
-                                          ? Colors
-                                              .green
-                                              .shade50
-                                          : Colors
-                                              .orange
-                                              .shade50,
+                                          ? isDark
+                                              ? const Color(
+                                                  0xff12372A,
+                                                )
+                                              : Colors
+                                                  .green
+                                                  .shade50
+                                          : isDark
+                                              ? const Color(
+                                                  0xff431407,
+                                                )
+                                              : Colors
+                                                  .orange
+                                                  .shade50,
                                   borderRadius:
-                                      BorderRadius.circular(
-                                    20,
-                                  ),
+                                      BorderRadius
+                                          .circular(20),
                                 ),
                                 child: Row(
                                   children: [
                                     Icon(
-                                      totalEvents == 0
+                                      totalEvents ==
+                                              0
                                           ? Icons
                                               .info_outline
                                           : clearPercentage >=
@@ -429,14 +532,17 @@ class _ReportsScreenState extends State<ReportsScreen> {
                                                   .verified
                                               : Icons
                                                   .warning_amber_rounded,
-                                      color: totalEvents == 0
-                                          ? Colors.grey
-                                          : clearPercentage >=
-                                                  dirtyPercentage
+                                      color:
+                                          totalEvents ==
+                                                  0
                                               ? Colors
-                                                  .green
-                                              : Colors
-                                                  .orange,
+                                                  .grey
+                                              : clearPercentage >=
+                                                      dirtyPercentage
+                                                  ? Colors
+                                                      .green
+                                                  : Colors
+                                                      .orange,
                                       size: 35,
                                     ),
 
@@ -446,18 +552,25 @@ class _ReportsScreenState extends State<ReportsScreen> {
 
                                     Expanded(
                                       child: Text(
-                                        totalEvents == 0
+                                        totalEvents ==
+                                                0
                                             ? "No report data available for this user yet."
                                             : clearPercentage >=
                                                     dirtyPercentage
                                                 ? "Most recorded water quality events are clear."
                                                 : "Dirty water events are higher than clear water events.",
                                         style:
-                                            const TextStyle(
+                                            TextStyle(
                                           fontWeight:
                                               FontWeight
                                                   .w600,
-                                          height: 1.4,
+                                          height:
+                                              1.4,
+                                          color: isDark
+                                              ? Colors
+                                                  .white70
+                                              : Colors
+                                                  .black87,
                                         ),
                                       ),
                                     ),
@@ -480,16 +593,27 @@ class _ReportsScreenState extends State<ReportsScreen> {
     required String value,
     required Color color,
   }) {
+    final bool isDark =
+        Theme.of(context).brightness ==
+            Brightness.dark;
+
     return Container(
       padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(20),
-        boxShadow: const [
+        color: isDark
+            ? const Color(0xff1E293B)
+            : Colors.white,
+        borderRadius:
+            BorderRadius.circular(20),
+        boxShadow: [
           BoxShadow(
-            color: Colors.black12,
+            color: Colors.black.withValues(
+              alpha:
+                  isDark ? 0.25 : 0.08,
+            ),
             blurRadius: 8,
-            offset: Offset(0, 4),
+            offset:
+                const Offset(0, 4),
           ),
         ],
       ),
@@ -498,10 +622,11 @@ class _ReportsScreenState extends State<ReportsScreen> {
             MainAxisAlignment.center,
         children: [
           Container(
-            padding: const EdgeInsets.all(10),
+            padding:
+                const EdgeInsets.all(10),
             decoration: BoxDecoration(
               color: color.withValues(
-                alpha: 0.12,
+                alpha: 0.15,
               ),
               shape: BoxShape.circle,
             ),
@@ -516,11 +641,13 @@ class _ReportsScreenState extends State<ReportsScreen> {
 
           Text(
             value,
-            textAlign: TextAlign.center,
+            textAlign:
+                TextAlign.center,
             style: TextStyle(
               color: color,
               fontSize: 21,
-              fontWeight: FontWeight.bold,
+              fontWeight:
+                  FontWeight.bold,
             ),
           ),
 
@@ -528,9 +655,12 @@ class _ReportsScreenState extends State<ReportsScreen> {
 
           Text(
             title,
-            textAlign: TextAlign.center,
-            style: const TextStyle(
-              color: Colors.grey,
+            textAlign:
+                TextAlign.center,
+            style: TextStyle(
+              color: isDark
+                  ? Colors.white60
+                  : Colors.grey,
             ),
           ),
         ],
@@ -543,6 +673,10 @@ class _ReportsScreenState extends State<ReportsScreen> {
     required double percentage,
     required Color color,
   }) {
+    final bool isDark =
+        Theme.of(context).brightness ==
+            Brightness.dark;
+
     return Column(
       children: [
         Row(
@@ -550,8 +684,12 @@ class _ReportsScreenState extends State<ReportsScreen> {
             Expanded(
               child: Text(
                 title,
-                style: const TextStyle(
-                  fontWeight: FontWeight.w600,
+                style: TextStyle(
+                  fontWeight:
+                      FontWeight.w600,
+                  color: isDark
+                      ? Colors.white
+                      : Colors.black87,
                 ),
               ),
             ),
@@ -560,7 +698,8 @@ class _ReportsScreenState extends State<ReportsScreen> {
               "${percentage.toStringAsFixed(1)}%",
               style: TextStyle(
                 color: color,
-                fontWeight: FontWeight.bold,
+                fontWeight:
+                    FontWeight.bold,
               ),
             ),
           ],
@@ -570,13 +709,15 @@ class _ReportsScreenState extends State<ReportsScreen> {
 
         LinearProgressIndicator(
           value:
-              (percentage / 100).clamp(0.0, 1.0),
+              (percentage / 100)
+                  .clamp(0.0, 1.0),
           minHeight: 12,
           borderRadius:
               BorderRadius.circular(20),
           color: color,
-          backgroundColor:
-              Colors.grey.shade200,
+          backgroundColor: isDark
+              ? Colors.white12
+              : Colors.grey.shade200,
         ),
       ],
     );

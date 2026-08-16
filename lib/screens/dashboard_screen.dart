@@ -1,3 +1,4 @@
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_database/firebase_database.dart';
 import 'package:flutter/material.dart';
@@ -13,10 +14,12 @@ class DashboardScreen extends StatefulWidget {
   const DashboardScreen({super.key});
 
   @override
-  State<DashboardScreen> createState() => _DashboardScreenState();
+  State<DashboardScreen> createState() =>
+      _DashboardScreenState();
 }
 
-class _DashboardScreenState extends State<DashboardScreen> {
+class _DashboardScreenState
+    extends State<DashboardScreen> {
   int currentIndex = 0;
 
   final List<Widget> pages = const [
@@ -29,67 +32,220 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      extendBody: true,
-      body: pages[currentIndex],
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final bool isWeb =
+            constraints.maxWidth >= 900;
 
-      bottomNavigationBar: Container(
-        margin: const EdgeInsets.all(15),
+        if (isWeb) {
+          return Scaffold(
+            body: Row(
+              children: [
+                Container(
+                  width: 250,
+                  color: Colors.white,
+                  child: SafeArea(
+                    child: Column(
+                      children: [
+                        const SizedBox(height: 25),
 
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(30),
-          boxShadow: const [
-            BoxShadow(
-              color: Colors.black12,
-              blurRadius: 20,
+                        const Icon(
+                          Icons.water_drop,
+                          size: 55,
+                          color: AppColors.primary,
+                        ),
+
+                        const SizedBox(height: 10),
+
+                        const Text(
+                          "Water Quality",
+                          style: TextStyle(
+                            fontSize: 20,
+                            fontWeight:
+                                FontWeight.bold,
+                          ),
+                        ),
+
+                        const Text(
+                          "Monitoring System",
+                          style: TextStyle(
+                            color: Colors.grey,
+                          ),
+                        ),
+
+                        const SizedBox(height: 35),
+
+                        webNavItem(
+                          index: 0,
+                          icon: Icons.home,
+                          title: "Dashboard",
+                        ),
+
+                        webNavItem(
+                          index: 1,
+                          icon: Icons.monitor_heart,
+                          title: "Monitoring",
+                        ),
+
+                        webNavItem(
+                          index: 2,
+                          icon: Icons.water_drop,
+                          title: "Valve Control",
+                        ),
+
+                        webNavItem(
+                          index: 3,
+                          icon: Icons.history,
+                          title: "History",
+                        ),
+
+                        webNavItem(
+                          index: 4,
+                          icon: Icons.settings,
+                          title: "Settings",
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+
+                Expanded(
+                  child: pages[currentIndex],
+                ),
+              ],
             ),
-          ],
-        ),
+          );
+        }
 
-        child: ClipRRect(
-          borderRadius: BorderRadius.circular(30),
+        return Scaffold(
+          extendBody: true,
+          body: pages[currentIndex],
 
-          child: NavigationBar(
-            selectedIndex: currentIndex,
-            backgroundColor: Colors.white,
-            indicatorColor:
-                AppColors.primary.withValues(alpha: 0.15),
-
-            onDestinationSelected: (index) {
-              setState(() {
-                currentIndex = index;
-              });
-            },
-
-            destinations: const [
-              NavigationDestination(
-                icon: Icon(Icons.home_outlined),
-                selectedIcon: Icon(Icons.home),
-                label: "Home",
+          bottomNavigationBar: Container(
+            margin: const EdgeInsets.all(15),
+            decoration: BoxDecoration(
+              borderRadius:
+                  BorderRadius.circular(30),
+              boxShadow: const [
+                BoxShadow(
+                  color: Colors.black12,
+                  blurRadius: 20,
+                ),
+              ],
+            ),
+            child: ClipRRect(
+              borderRadius:
+                  BorderRadius.circular(30),
+              child: NavigationBar(
+                selectedIndex: currentIndex,
+                backgroundColor: Colors.white,
+                indicatorColor:
+                    AppColors.primary.withValues(
+                  alpha: 0.15,
+                ),
+                onDestinationSelected: (index) {
+                  setState(() {
+                    currentIndex = index;
+                  });
+                },
+                destinations: const [
+                  NavigationDestination(
+                    icon:
+                        Icon(Icons.home_outlined),
+                    selectedIcon:
+                        Icon(Icons.home),
+                    label: "Home",
+                  ),
+                  NavigationDestination(
+                    icon: Icon(
+                      Icons.monitor_heart_outlined,
+                    ),
+                    selectedIcon:
+                        Icon(Icons.monitor_heart),
+                    label: "Monitor",
+                  ),
+                  NavigationDestination(
+                    icon: Icon(
+                      Icons.water_drop_outlined,
+                    ),
+                    selectedIcon:
+                        Icon(Icons.water_drop),
+                    label: "Valve",
+                  ),
+                  NavigationDestination(
+                    icon: Icon(Icons.history),
+                    label: "History",
+                  ),
+                  NavigationDestination(
+                    icon:
+                        Icon(Icons.settings_outlined),
+                    selectedIcon:
+                        Icon(Icons.settings),
+                    label: "Settings",
+                  ),
+                ],
               ),
+            ),
+          ),
+        );
+      },
+    );
+  }
 
-              NavigationDestination(
-                icon: Icon(Icons.monitor_heart_outlined),
-                selectedIcon: Icon(Icons.monitor_heart),
-                label: "Monitor",
+  Widget webNavItem({
+    required int index,
+    required IconData icon,
+    required String title,
+  }) {
+    final bool selected =
+        currentIndex == index;
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(
+        horizontal: 15,
+        vertical: 5,
+      ),
+      child: InkWell(
+        borderRadius:
+            BorderRadius.circular(15),
+        onTap: () {
+          setState(() {
+            currentIndex = index;
+          });
+        },
+        child: Container(
+          padding: const EdgeInsets.symmetric(
+            horizontal: 15,
+            vertical: 15,
+          ),
+          decoration: BoxDecoration(
+            color: selected
+                ? AppColors.primary.withValues(
+                    alpha: 0.12,
+                  )
+                : Colors.transparent,
+            borderRadius:
+                BorderRadius.circular(15),
+          ),
+          child: Row(
+            children: [
+              Icon(
+                icon,
+                color: selected
+                    ? AppColors.primary
+                    : Colors.grey,
               ),
-
-              NavigationDestination(
-                icon: Icon(Icons.water_drop_outlined),
-                selectedIcon: Icon(Icons.water_drop),
-                label: "Valve",
-              ),
-
-              NavigationDestination(
-                icon: Icon(Icons.history),
-                selectedIcon: Icon(Icons.history),
-                label: "History",
-              ),
-
-              NavigationDestination(
-                icon: Icon(Icons.settings_outlined),
-                selectedIcon: Icon(Icons.settings),
-                label: "Settings",
+              const SizedBox(width: 15),
+              Text(
+                title,
+                style: TextStyle(
+                  color: selected
+                      ? AppColors.primary
+                      : Colors.grey.shade700,
+                  fontWeight: selected
+                      ? FontWeight.bold
+                      : FontWeight.normal,
+                ),
               ),
             ],
           ),
@@ -103,548 +259,539 @@ class HomePage extends StatefulWidget {
   const HomePage({super.key});
 
   @override
-  State<HomePage> createState() => _HomePageState();
+  State<HomePage> createState() =>
+      _HomePageState();
 }
 
-class _HomePageState extends State<HomePage> {
+class _HomePageState
+    extends State<HomePage> {
   late final FirebaseDatabase database;
-  late final DatabaseReference sensorRef;
+
+  DatabaseReference? sensorRef;
 
   double turbidity = 0;
 
   String waterStatus = "UNKNOWN";
   String valve = "UNKNOWN";
-  String deviceStatus = "CONNECTING";
+  String deviceStatus = "OFFLINE";
 
   bool isLoading = true;
+  String? errorMessage;
 
   @override
   void initState() {
     super.initState();
 
-    database = FirebaseDatabase.instanceFor(
+    database =
+        FirebaseDatabase.instanceFor(
       app: Firebase.app(),
       databaseURL:
           'https://water-quality-monitoring-94502-default-rtdb.asia-southeast1.firebasedatabase.app/',
     );
 
-    sensorRef = database.ref("sensor");
-
-    listenToFirebase();
+    setupUserDatabase();
   }
 
-  void listenToFirebase() {
-    sensorRef.onValue.listen(
+  void setupUserDatabase() {
+    final User? user =
+        FirebaseAuth.instance.currentUser;
+
+    if (user == null) {
+      setState(() {
+        isLoading = false;
+        errorMessage =
+            "No logged-in user found";
+      });
+
+      return;
+    }
+
+    sensorRef = database.ref(
+      'users/${user.uid}/sensor',
+    );
+
+    listenFirebase();
+  }
+
+  void listenFirebase() {
+    sensorRef!.onValue.listen(
       (DatabaseEvent event) {
         if (!mounted) return;
 
-        final value = event.snapshot.value;
+        final value =
+            event.snapshot.value;
 
         if (value is Map) {
-          final data = Map<dynamic, dynamic>.from(value);
+          final data =
+              Map<dynamic, dynamic>.from(
+            value,
+          );
 
-          final rawTurbidity = data["turbidity"];
+          final raw =
+              data["turbidity"];
 
           double newTurbidity = 0;
 
-          if (rawTurbidity is num) {
-            newTurbidity = rawTurbidity.toDouble();
+          if (raw is num) {
+            newTurbidity =
+                raw.toDouble();
           } else {
             newTurbidity =
-                double.tryParse(rawTurbidity.toString()) ?? 0;
+                double.tryParse(
+                      raw.toString(),
+                    ) ??
+                    0;
           }
 
           setState(() {
-                turbidity = newTurbidity;
+            turbidity =
+                newTurbidity;
 
-                // Automatic water quality detection
-                waterStatus =
-                    turbidity < 300 ? "CLEAR" : "DIRTY";
+            waterStatus =
+                turbidity < 300
+                    ? "CLEAR"
+                    : "DIRTY";
 
-                valve =
-                    data["valve"]?.toString().toUpperCase() ??
-                        "UNKNOWN";
+            valve =
+                data["valve"]
+                        ?.toString()
+                        .toUpperCase() ??
+                    "UNKNOWN";
 
-                deviceStatus =
-                    data["deviceStatus"]?.toString().toUpperCase() ??
-                        "ONLINE";
+            deviceStatus =
+                data["deviceStatus"]
+                        ?.toString()
+                        .toUpperCase() ??
+                    "OFFLINE";
 
-                isLoading = false;
-              });
+            isLoading = false;
+            errorMessage = null;
+          });
         } else {
           setState(() {
+            turbidity = 0;
+            waterStatus = "UNKNOWN";
+            valve = "UNKNOWN";
             deviceStatus = "OFFLINE";
+
             isLoading = false;
+
+            errorMessage =
+                "No sensor data available for this user";
           });
         }
       },
-
-      onError: (error) {
+      onError: (Object error) {
         if (!mounted) return;
 
         setState(() {
-          deviceStatus = "OFFLINE";
           isLoading = false;
+          errorMessage =
+              error.toString();
         });
-
-        debugPrint("Dashboard Firebase Error: $error");
       },
     );
   }
 
-  bool get isClean => waterStatus == "CLEAR";
+  bool get clean =>
+      waterStatus == "CLEAR";
 
-  bool get valveOpen => valve == "OPEN";
-
-  bool get deviceOnline => deviceStatus == "ONLINE";
+  bool get valveOpen =>
+      valve == "OPEN";
 
   @override
   Widget build(BuildContext context) {
     if (isLoading) {
       return const Scaffold(
-        backgroundColor: Color(0xffF4F9FC),
+        backgroundColor:
+            Color(0xffF4F9FC),
         body: Center(
-          child: CircularProgressIndicator(),
+          child:
+              CircularProgressIndicator(),
         ),
       );
     }
 
     return Scaffold(
-      backgroundColor: const Color(0xffF4F9FC),
+      backgroundColor:
+          const Color(0xffF4F9FC),
 
       body: SafeArea(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.fromLTRB(
-            20,
-            20,
-            20,
-            110,
-          ),
+        child: LayoutBuilder(
+          builder: (
+            context,
+            constraints,
+          ) {
+            final bool desktop =
+                constraints.maxWidth >= 800;
 
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+            return SingleChildScrollView(
+              padding:
+                  const EdgeInsets.all(25),
 
-            children: [
-              // Header
-              Row(
-                mainAxisAlignment:
-                    MainAxisAlignment.spaceBetween,
+              child: Center(
+                child: ConstrainedBox(
+                  constraints:
+                      const BoxConstraints(
+                    maxWidth: 1200,
+                  ),
 
-                children: [
-                  const Column(
+                  child: Column(
                     crossAxisAlignment:
                         CrossAxisAlignment.start,
 
                     children: [
-                      Text(
-                        "Welcome 👋",
+                      const Text(
+                        "Water Quality Dashboard",
+                        style: TextStyle(
+                          fontSize: 28,
+                          fontWeight:
+                              FontWeight.bold,
+                        ),
+                      ),
+
+                      const SizedBox(
+                        height: 5,
+                      ),
+
+                      const Text(
+                        "Real-time water monitoring",
                         style: TextStyle(
                           color: Colors.grey,
-                          fontSize: 16,
                         ),
                       ),
 
-                      Text(
-                        "Water Monitoring",
-                        style: TextStyle(
-                          fontSize: 26,
-                          fontWeight: FontWeight.bold,
+                      if (errorMessage !=
+                          null) ...[
+                        const SizedBox(
+                          height: 20,
                         ),
+
+                        Container(
+                          width:
+                              double.infinity,
+                          padding:
+                              const EdgeInsets
+                                  .all(16),
+                          decoration:
+                              BoxDecoration(
+                            color: Colors
+                                .orange
+                                .shade50,
+                            borderRadius:
+                                BorderRadius
+                                    .circular(
+                              15,
+                            ),
+                          ),
+                          child: Row(
+                            children: [
+                              const Icon(
+                                Icons
+                                    .info_outline,
+                                color: Colors
+                                    .orange,
+                              ),
+                              const SizedBox(
+                                width: 10,
+                              ),
+                              Expanded(
+                                child: Text(
+                                  errorMessage!,
+                                  style:
+                                      const TextStyle(
+                                    color:
+                                        Colors
+                                            .orange,
+                                    fontWeight:
+                                        FontWeight
+                                            .w600,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+
+                      const SizedBox(
+                        height: 25,
                       ),
-                    ],
-                  ),
 
-                  Container(
-                    padding: const EdgeInsets.all(12),
+                      Container(
+                        width:
+                            double.infinity,
+                        padding:
+                            const EdgeInsets
+                                .all(30),
 
-                    decoration: BoxDecoration(
-                      gradient: const LinearGradient(
-                        colors: [
-                          Color(0xff0284C7),
-                          Color(0xff38BDF8),
-                        ],
-                      ),
+                        decoration:
+                            BoxDecoration(
+                          gradient:
+                              LinearGradient(
+                            colors:
+                                waterStatus ==
+                                        "UNKNOWN"
+                                    ? const [
+                                        Colors
+                                            .grey,
+                                        Colors
+                                            .blueGrey,
+                                      ]
+                                    : clean
+                                        ? const [
+                                            Color(
+                                              0xff0284C7,
+                                            ),
+                                            Color(
+                                              0xff38BDF8,
+                                            ),
+                                          ]
+                                        : const [
+                                            Colors
+                                                .red,
+                                            Colors
+                                                .orange,
+                                          ],
+                          ),
+                          borderRadius:
+                              BorderRadius
+                                  .circular(30),
+                        ),
 
-                      borderRadius: BorderRadius.circular(18),
-                    ),
+                        child: Column(
+                          children: [
+                            Icon(
+                              waterStatus ==
+                                      "UNKNOWN"
+                                  ? Icons
+                                      .sensors_off
+                                  : clean
+                                      ? Icons
+                                          .water_drop
+                                      : Icons
+                                          .warning_rounded,
+                              color:
+                                  Colors.white,
+                              size: 65,
+                            ),
 
-                    child: const Icon(
-                      Icons.water_drop,
-                      color: Colors.white,
-                      size: 30,
-                    ),
-                  ),
-                ],
-              ),
+                            const SizedBox(
+                              height: 15,
+                            ),
 
-              const SizedBox(height: 25),
+                            const Text(
+                              "WATER QUALITY",
+                              style: TextStyle(
+                                color: Colors
+                                    .white70,
+                              ),
+                            ),
 
-              // Main Water Status
-              Container(
-                width: double.infinity,
-                padding: const EdgeInsets.all(25),
+                            const SizedBox(
+                              height: 5,
+                            ),
 
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    colors: isClean
-                        ? const [
-                            Color(0xff0284C7),
-                            Color(0xff38BDF8),
-                          ]
-                        : const [
-                            Color(0xffDC2626),
-                            Color(0xffF97316),
+                            Text(
+                              waterStatus,
+                              style:
+                                  const TextStyle(
+                                color:
+                                    Colors.white,
+                                fontSize: 40,
+                                fontWeight:
+                                    FontWeight
+                                        .bold,
+                              ),
+                            ),
                           ],
-                  ),
-
-                  borderRadius: BorderRadius.circular(30),
-
-                  boxShadow: [
-                    BoxShadow(
-                      color: isClean
-                          ? Colors.blue.withValues(alpha: 0.25)
-                          : Colors.red.withValues(alpha: 0.25),
-                      blurRadius: 20,
-                      offset: const Offset(0, 10),
-                    ),
-                  ],
-                ),
-
-                child: Column(
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.all(18),
-
-                      decoration: const BoxDecoration(
-                        color: Colors.white24,
-                        shape: BoxShape.circle,
+                        ),
                       ),
 
-                      child: Icon(
-                        isClean
-                            ? Icons.water_drop
-                            : Icons.warning_rounded,
-                        color: Colors.white,
-                        size: 55,
+                      const SizedBox(
+                        height: 25,
                       ),
-                    ),
 
-                    const SizedBox(height: 15),
-
-                    const Text(
-                      "WATER QUALITY",
-                      style: TextStyle(
-                        color: Colors.white70,
-                        fontSize: 15,
-                      ),
-                    ),
-
-                    const SizedBox(height: 7),
-
-                    Text(
-                      waterStatus,
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 38,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-
-                    const SizedBox(height: 10),
-
-                    Text(
-                      isClean
-                          ? "Water flow is normal"
-                          : "Dirty water detected",
-                      style: const TextStyle(
-                        color: Colors.white70,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-
-              const SizedBox(height: 25),
-
-              const Text(
-                "Live System Status",
-                style: TextStyle(
-                  fontSize: 21,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-
-              const SizedBox(height: 15),
-
-              // Turbidity + Valve
-              Row(
-                children: [
-                  Expanded(
-                    child: smallStatusCard(
-                      icon: Icons.speed,
-                      title: "Turbidity",
-                      value: "${turbidity.toInt()} NTU",
-                      color: isClean
-                          ? AppColors.primary
-                          : Colors.red,
-                    ),
-                  ),
-
-                  const SizedBox(width: 15),
-
-                  Expanded(
-                    child: smallStatusCard(
-                      icon: valveOpen
-                          ? Icons.water_drop
-                          : Icons.block,
-                      title: "Valve",
-                      value: valve,
-                      color: valveOpen
-                          ? Colors.green
-                          : Colors.red,
-                    ),
-                  ),
-                ],
-              ),
-
-              const SizedBox(height: 15),
-
-              // Device
-              wideStatusCard(
-                icon:
-                    deviceOnline ? Icons.wifi : Icons.wifi_off,
-                title: "ESP32 Device",
-                value: deviceStatus,
-                color: deviceOnline
-                    ? Colors.green
-                    : Colors.red,
-              ),
-
-              const SizedBox(height: 25),
-
-              // Water Flow Information
-              Container(
-                width: double.infinity,
-                padding: const EdgeInsets.all(20),
-
-                decoration: BoxDecoration(
-                  color: isClean
-                      ? Colors.green.shade50
-                      : Colors.red.shade50,
-                  borderRadius: BorderRadius.circular(22),
-                ),
-
-                child: Row(
-                  children: [
-                    Icon(
-                      isClean
-                          ? Icons.check_circle
-                          : Icons.warning_amber_rounded,
-                      color: isClean
-                          ? Colors.green
-                          : Colors.red,
-                      size: 40,
-                    ),
-
-                    const SizedBox(width: 15),
-
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment:
-                            CrossAxisAlignment.start,
+                      GridView.count(
+                        shrinkWrap: true,
+                        physics:
+                            const NeverScrollableScrollPhysics(),
+                        crossAxisCount:
+                            desktop ? 3 : 1,
+                        childAspectRatio:
+                            desktop
+                                ? 2.2
+                                : 3.4,
+                        crossAxisSpacing: 15,
+                        mainAxisSpacing: 15,
 
                         children: [
-                          Text(
-                            isClean
-                                ? "System Normal"
-                                : "Warning",
-                            style: TextStyle(
-                              fontWeight: FontWeight.bold,
-                              fontSize: 17,
-                              color: isClean
-                                  ? Colors.green.shade800
-                                  : Colors.red.shade800,
-                            ),
+                          statusCard(
+                            icon: Icons.speed,
+                            title:
+                                "Turbidity",
+                            value:
+                                waterStatus ==
+                                        "UNKNOWN"
+                                    ? "--"
+                                    : "${turbidity.toInt()} NTU",
+                            color:
+                                waterStatus ==
+                                        "UNKNOWN"
+                                    ? Colors.grey
+                                    : clean
+                                        ? AppColors
+                                            .primary
+                                        : Colors
+                                            .red,
                           ),
 
-                          const SizedBox(height: 3),
+                          statusCard(
+                            icon: valveOpen
+                                ? Icons
+                                    .water_drop
+                                : Icons.block,
+                            title: "Valve",
+                            value: valve,
+                            color: valveOpen
+                                ? Colors.green
+                                : valve ==
+                                        "CLOSED"
+                                    ? Colors.red
+                                    : Colors
+                                        .grey,
+                          ),
 
-                          Text(
-                            isClean
-                                ? "Clean water is flowing through the tank."
-                                : valveOpen
-                                    ? "Dirty water detected. Valve has been manually opened."
-                                    : "Dirty water detected. Water flow is blocked.",
-                            style: TextStyle(
-                              color: isClean
-                                  ? Colors.green.shade700
-                                  : Colors.red.shade700,
-                            ),
+                          statusCard(
+                            icon: Icons.wifi,
+                            title:
+                                "ESP32 Device",
+                            value:
+                                deviceStatus,
+                            color:
+                                deviceStatus ==
+                                        "ONLINE"
+                                    ? Colors
+                                        .green
+                                    : Colors.red,
                           ),
                         ],
                       ),
-                    ),
-                  ],
-                ),
-              ),
 
-              const SizedBox(height: 25),
-
-              // Reports
-              InkWell(
-                borderRadius: BorderRadius.circular(22),
-
-                onTap: () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (context) =>
-                          const ReportsScreen(),
-                    ),
-                  );
-                },
-
-                child: Container(
-                  width: double.infinity,
-                  padding: const EdgeInsets.all(20),
-
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(22),
-
-                    boxShadow: const [
-                      BoxShadow(
-                        color: Colors.black12,
-                        blurRadius: 8,
-                        offset: Offset(0, 4),
+                      const SizedBox(
+                        height: 25,
                       ),
-                    ],
-                  ),
 
-                  child: const Row(
-                    children: [
-                      CircleAvatar(
-                        backgroundColor:
-                            Color(0xffE0F2FE),
-
-                        child: Icon(
-                          Icons.bar_chart,
-                          color: AppColors.primary,
+                      InkWell(
+                        borderRadius:
+                            BorderRadius.circular(
+                          20,
                         ),
-                      ),
 
-                      SizedBox(width: 15),
+                        onTap: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder:
+                                  (context) =>
+                                      const ReportsScreen(),
+                            ),
+                          );
+                        },
 
-                      Expanded(
-                        child: Text(
-                          "View Water Reports",
-                          style: TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.bold,
+                        child: Container(
+                          width:
+                              double.infinity,
+                          padding:
+                              const EdgeInsets
+                                  .all(20),
+
+                          decoration:
+                              BoxDecoration(
+                            color:
+                                Colors.white,
+                            borderRadius:
+                                BorderRadius
+                                    .circular(
+                              20,
+                            ),
+                            boxShadow:
+                                const [
+                              BoxShadow(
+                                color: Colors
+                                    .black12,
+                                blurRadius: 8,
+                              ),
+                            ],
+                          ),
+
+                          child: const Row(
+                            children: [
+                              Icon(
+                                Icons
+                                    .bar_chart,
+                                color:
+                                    AppColors
+                                        .primary,
+                                size: 32,
+                              ),
+
+                              SizedBox(
+                                width: 15,
+                              ),
+
+                              Expanded(
+                                child: Text(
+                                  "View Water Reports",
+                                  style:
+                                      TextStyle(
+                                    fontSize:
+                                        17,
+                                    fontWeight:
+                                        FontWeight
+                                            .bold,
+                                  ),
+                                ),
+                              ),
+
+                              Icon(
+                                Icons
+                                    .arrow_forward_ios,
+                                size: 18,
+                              ),
+                            ],
                           ),
                         ),
                       ),
-
-                      Icon(
-                        Icons.arrow_forward_ios,
-                        size: 18,
-                        color: Colors.grey,
-                      ),
                     ],
                   ),
                 ),
               ),
-            ],
-          ),
+            );
+          },
         ),
       ),
     );
   }
 
-  Widget smallStatusCard({
+  Widget statusCard({
     required IconData icon,
     required String title,
     required String value,
     required Color color,
   }) {
     return Container(
-      padding: const EdgeInsets.all(18),
+      padding:
+          const EdgeInsets.all(20),
 
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(22),
-
+        borderRadius:
+            BorderRadius.circular(22),
         boxShadow: const [
           BoxShadow(
             color: Colors.black12,
             blurRadius: 8,
-            offset: Offset(0, 4),
-          ),
-        ],
-      ),
-
-      child: Column(
-        children: [
-          Container(
-            padding: const EdgeInsets.all(10),
-
-            decoration: BoxDecoration(
-              color: color.withValues(alpha: 0.12),
-              borderRadius: BorderRadius.circular(15),
-            ),
-
-            child: Icon(
-              icon,
-              color: color,
-              size: 30,
-            ),
-          ),
-
-          const SizedBox(height: 10),
-
-          Text(
-            title,
-            style: const TextStyle(
-              color: Colors.grey,
-            ),
-          ),
-
-          const SizedBox(height: 5),
-
-          FittedBox(
-            child: Text(
-              value,
-              style: TextStyle(
-                fontSize: 17,
-                fontWeight: FontWeight.bold,
-                color: color,
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget wideStatusCard({
-    required IconData icon,
-    required String title,
-    required String value,
-    required Color color,
-  }) {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(18),
-
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(22),
-
-        boxShadow: const [
-          BoxShadow(
-            color: Colors.black12,
-            blurRadius: 8,
-            offset: Offset(0, 4),
           ),
         ],
       ),
@@ -652,13 +799,15 @@ class _HomePageState extends State<HomePage> {
       child: Row(
         children: [
           Container(
-            padding: const EdgeInsets.all(12),
-
+            padding:
+                const EdgeInsets.all(12),
             decoration: BoxDecoration(
-              color: color.withValues(alpha: 0.12),
-              borderRadius: BorderRadius.circular(15),
+              color: color.withValues(
+                alpha: 0.12,
+              ),
+              borderRadius:
+                  BorderRadius.circular(15),
             ),
-
             child: Icon(
               icon,
               color: color,
@@ -670,25 +819,30 @@ class _HomePageState extends State<HomePage> {
 
           Expanded(
             child: Column(
+              mainAxisAlignment:
+                  MainAxisAlignment.center,
               crossAxisAlignment:
                   CrossAxisAlignment.start,
-
               children: [
                 Text(
                   title,
-                  style: const TextStyle(
+                  style:
+                      const TextStyle(
                     color: Colors.grey,
                   ),
                 ),
 
-                const SizedBox(height: 4),
+                const SizedBox(
+                  height: 4,
+                ),
 
                 Text(
                   value,
                   style: TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
                     color: color,
+                    fontSize: 18,
+                    fontWeight:
+                        FontWeight.bold,
                   ),
                 ),
               ],

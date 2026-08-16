@@ -1,3 +1,6 @@
+import 'dart:async';
+
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_database/firebase_database.dart';
 import 'package:flutter/material.dart';
@@ -13,14 +16,16 @@ class ReportsScreen extends StatefulWidget {
 
 class _ReportsScreenState extends State<ReportsScreen> {
   late final FirebaseDatabase database;
-  late final DatabaseReference historyRef;
+
+  DatabaseReference? historyRef;
+  StreamSubscription<DatabaseEvent>? historySubscription;
 
   bool isLoading = true;
+  String? errorMessage;
 
   int totalEvents = 0;
-  int cleanCount = 0;
+  int clearCount = 0;
   int dirtyCount = 0;
-
   int valveOpenCount = 0;
   int valveClosedCount = 0;
 
@@ -36,125 +41,153 @@ class _ReportsScreenState extends State<ReportsScreen> {
           'https://water-quality-monitoring-94502-default-rtdb.asia-southeast1.firebasedatabase.app/',
     );
 
-    historyRef = database.ref("history");
+    setupUserReports();
+  }
+
+  void setupUserReports() {
+    final User? user = FirebaseAuth.instance.currentUser;
+
+    if (user == null) {
+      setState(() {
+        isLoading = false;
+        errorMessage = "No logged-in user found";
+      });
+
+      return;
+    }
+
+    historyRef = database.ref(
+      'users/${user.uid}/history',
+    );
 
     listenReports();
   }
 
   void listenReports() {
-    historyRef.onValue.listen(
+    historySubscription = historyRef!.onValue.listen(
       (DatabaseEvent event) {
         if (!mounted) return;
 
         final value = event.snapshot.value;
 
-        if (value is Map) {
-          final data = Map<dynamic, dynamic>.from(value);
-
-          int clean = 0;
-          int dirty = 0;
-
-          int open = 0;
-          int closed = 0;
-
-          double totalTurbidity = 0;
-          int turbidityRecords = 0;
-
-          data.forEach((key, value) {
-            if (value is Map) {
-              final item = Map<dynamic, dynamic>.from(value);
-
-              final String status =
-                  item["waterStatus"]
-                      ?.toString()
-                      .toUpperCase() ??
-                  "UNKNOWN";
-
-              final String valve =
-                  item["valve"]
-                      ?.toString()
-                      .toUpperCase() ??
-                  "UNKNOWN";
-
-              final dynamic rawTurbidity =
-                  item["turbidity"];
-
-              double turbidity = 0;
-
-              if (rawTurbidity is num) {
-                turbidity = rawTurbidity.toDouble();
-              } else {
-                turbidity =
-                    double.tryParse(
-                      rawTurbidity.toString(),
-                    ) ??
-                    0;
-              }
-
-              if (status == "CLEAR") {
-                clean++;
-              }
-
-              if (status == "DIRTY") {
-                dirty++;
-              }
-
-              if (valve == "OPEN") {
-                open++;
-              }
-
-              if (valve == "CLOSED") {
-                closed++;
-              }
-
-              totalTurbidity += turbidity;
-              turbidityRecords++;
-            }
-          });
-
-          setState(() {
-            totalEvents = data.length;
-
-            cleanCount = clean;
-            dirtyCount = dirty;
-
-            valveOpenCount = open;
-            valveClosedCount = closed;
-
-            if (turbidityRecords > 0) {
-              averageTurbidity =
-                  totalTurbidity / turbidityRecords;
-            } else {
-              averageTurbidity = 0;
-            }
-
-            isLoading = false;
-          });
-        } else {
+        if (value is! Map) {
           setState(() {
             totalEvents = 0;
-
-            cleanCount = 0;
+            clearCount = 0;
             dirtyCount = 0;
-
             valveOpenCount = 0;
             valveClosedCount = 0;
-
             averageTurbidity = 0;
-
             isLoading = false;
+            errorMessage = null;
           });
-        }
-      },
 
-      onError: (error) {
+          return;
+        }
+
+        final data = Map<dynamic, dynamic>.from(value);
+
+        int total = 0;
+        int clear = 0;
+        int dirty = 0;
+        int open = 0;
+        int closed = 0;
+
+        double turbidityTotal = 0;
+
+        data.forEach((key, value) {
+          if (value is Map) {
+            final item =
+                Map<dynamic, dynamic>.from(value);
+
+            final String status =
+                item['waterStatus']
+                        ?.toString()
+                        .toUpperCase() ??
+                    'UNKNOWN';
+
+            final String valve =
+                item['valve']
+                        ?.toString()
+                        .toUpperCase() ??
+                    'UNKNOWN';
+
+            final double turbidity =
+                _toDouble(item['turbidity']);
+
+            total++;
+            turbidityTotal += turbidity;
+
+            if (status == 'CLEAR') {
+              clear++;
+            }
+
+            if (status == 'DIRTY') {
+              dirty++;
+            }
+
+            if (valve == 'OPEN') {
+              open++;
+            }
+
+            if (valve == 'CLOSED') {
+              closed++;
+            }
+          }
+        });
+
+        setState(() {
+          totalEvents = total;
+          clearCount = clear;
+          dirtyCount = dirty;
+          valveOpenCount = open;
+          valveClosedCount = closed;
+
+          averageTurbidity =
+              total == 0 ? 0 : turbidityTotal / total;
+
+          isLoading = false;
+          errorMessage = null;
+        });
+      },
+      onError: (Object error) {
         if (!mounted) return;
 
         setState(() {
           isLoading = false;
+          errorMessage = error.toString();
         });
       },
     );
+  }
+
+  double _toDouble(dynamic value) {
+    if (value is num) {
+      return value.toDouble();
+    }
+
+    return double.tryParse(
+          value?.toString() ?? '',
+        ) ??
+        0;
+  }
+
+  double get clearPercentage {
+    if (totalEvents == 0) return 0;
+
+    return (clearCount / totalEvents) * 100;
+  }
+
+  double get dirtyPercentage {
+    if (totalEvents == 0) return 0;
+
+    return (dirtyCount / totalEvents) * 100;
+  }
+
+  @override
+  void dispose() {
+    historySubscription?.cancel();
+    super.dispose();
   }
 
   @override
@@ -171,263 +204,287 @@ class _ReportsScreenState extends State<ReportsScreen> {
           ? const Center(
               child: CircularProgressIndicator(),
             )
-          : SingleChildScrollView(
-              padding: const EdgeInsets.all(20),
-
-              child: Column(
-                children: [
-                  // Main Report Card
-                  Container(
-                    width: double.infinity,
-                    padding: const EdgeInsets.all(25),
-
-                    decoration: BoxDecoration(
-                      gradient: const LinearGradient(
-                        colors: [
-                          Color(0xff0284C7),
-                          Color(0xff38BDF8),
-                        ],
-                      ),
-
-                      borderRadius:
-                          BorderRadius.circular(25),
-                    ),
-
-                    child: Column(
-                      children: [
-                        const Icon(
-                          Icons.analytics,
-                          size: 55,
-                          color: Colors.white,
-                        ),
-
-                        const SizedBox(height: 12),
-
-                        const Text(
-                          "Monitoring Summary",
-                          style: TextStyle(
-                            color: Colors.white,
-                            fontSize: 23,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-
-                        const SizedBox(height: 5),
-
-                        Text(
-                          "$totalEvents Total Events",
-                          style: const TextStyle(
-                            color: Colors.white70,
-                            fontSize: 16,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-
-                  const SizedBox(height: 25),
-
-                  // Clean / Dirty
-                  Row(
-                    children: [
-                      Expanded(
-                        child: reportCard(
-                          title: "Clean",
-                          value: cleanCount.toString(),
-                          icon: Icons.check_circle,
-                          color: Colors.green,
-                        ),
-                      ),
-
-                      const SizedBox(width: 15),
-
-                      Expanded(
-                        child: reportCard(
-                          title: "Dirty",
-                          value: dirtyCount.toString(),
-                          icon: Icons.warning_rounded,
-                          color: Colors.red,
-                        ),
-                      ),
-                    ],
-                  ),
-
-                  const SizedBox(height: 15),
-
-                  // Valve Counts
-                  Row(
-                    children: [
-                      Expanded(
-                        child: reportCard(
-                          title: "Valve Open",
-                          value:
-                              valveOpenCount.toString(),
-                          icon: Icons.water_drop,
-                          color: Colors.blue,
-                        ),
-                      ),
-
-                      const SizedBox(width: 15),
-
-                      Expanded(
-                        child: reportCard(
-                          title: "Valve Closed",
-                          value:
-                              valveClosedCount.toString(),
-                          icon: Icons.block,
-                          color: Colors.orange,
-                        ),
-                      ),
-                    ],
-                  ),
-
-                  const SizedBox(height: 20),
-
-                  // Average Turbidity
-                  Container(
-                    width: double.infinity,
-                    padding: const EdgeInsets.all(22),
-
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-
-                      borderRadius:
-                          BorderRadius.circular(20),
-
-                      boxShadow: const [
-                        BoxShadow(
-                          color: Colors.black12,
-                          blurRadius: 8,
-                          offset: Offset(0, 4),
-                        ),
-                      ],
-                    ),
-
-                    child: Row(
-                      children: [
-                        Container(
-                          padding:
-                              const EdgeInsets.all(12),
-
-                          decoration: BoxDecoration(
-                            color: AppColors.primary
-                                .withValues(
-                              alpha: 0.12,
-                            ),
-                            borderRadius:
-                                BorderRadius.circular(
-                              15,
-                            ),
-                          ),
-
-                          child: const Icon(
-                            Icons.speed,
-                            color: AppColors.primary,
-                            size: 35,
-                          ),
-                        ),
-
-                        const SizedBox(width: 18),
-
-                        Column(
-                          crossAxisAlignment:
-                              CrossAxisAlignment.start,
-                          children: [
-                            const Text(
-                              "Average Turbidity",
-                              style: TextStyle(
-                                color: Colors.grey,
-                              ),
-                            ),
-
-                            const SizedBox(height: 5),
-
-                            Text(
-                              "${averageTurbidity.toStringAsFixed(1)} NTU",
-                              style: const TextStyle(
-                                fontSize: 23,
-                                fontWeight:
-                                    FontWeight.bold,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ],
-                    ),
-                  ),
-
-                  const SizedBox(height: 25),
-
-                  // Water Quality Percentage
-                  Container(
-                    width: double.infinity,
+          : errorMessage != null
+              ? Center(
+                  child: Padding(
                     padding: const EdgeInsets.all(20),
-
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-
-                      borderRadius:
-                          BorderRadius.circular(20),
-
-                      boxShadow: const [
-                        BoxShadow(
-                          color: Colors.black12,
-                          blurRadius: 8,
-                          offset: Offset(0, 4),
-                        ),
-                      ],
-                    ),
-
-                    child: Column(
-                      crossAxisAlignment:
-                          CrossAxisAlignment.start,
-
-                      children: [
-                        const Text(
-                          "Water Quality Ratio",
-                          style: TextStyle(
-                            fontSize: 19,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-
-                        const SizedBox(height: 20),
-
-                        percentageRow(
-                          title: "Clean Water",
-                          count: cleanCount,
-                          color: Colors.green,
-                        ),
-
-                        const SizedBox(height: 18),
-
-                        percentageRow(
-                          title: "Dirty Water",
-                          count: dirtyCount,
-                          color: Colors.red,
-                        ),
-                      ],
+                    child: Text(
+                      errorMessage!,
+                      textAlign: TextAlign.center,
+                      style: const TextStyle(
+                        color: Colors.red,
+                      ),
                     ),
                   ),
-                ],
-              ),
-            ),
+                )
+              : LayoutBuilder(
+                  builder: (context, constraints) {
+                    final bool desktop =
+                        constraints.maxWidth >= 850;
+
+                    return SingleChildScrollView(
+                      padding: EdgeInsets.fromLTRB(
+                        desktop ? 35 : 18,
+                        20,
+                        desktop ? 35 : 18,
+                        120,
+                      ),
+                      child: Center(
+                        child: ConstrainedBox(
+                          constraints:
+                              const BoxConstraints(
+                            maxWidth: 1100,
+                          ),
+                          child: Column(
+                            crossAxisAlignment:
+                                CrossAxisAlignment.start,
+                            children: [
+                              const Text(
+                                "Water Quality Summary",
+                                style: TextStyle(
+                                  fontSize: 26,
+                                  fontWeight:
+                                      FontWeight.bold,
+                                ),
+                              ),
+
+                              const SizedBox(height: 5),
+
+                              const Text(
+                                "Calculated using this user's history data",
+                                style: TextStyle(
+                                  color: Colors.grey,
+                                ),
+                              ),
+
+                              const SizedBox(height: 25),
+
+                              GridView.count(
+                                shrinkWrap: true,
+                                physics:
+                                    const NeverScrollableScrollPhysics(),
+                                crossAxisCount:
+                                    desktop ? 3 : 2,
+                                crossAxisSpacing: 15,
+                                mainAxisSpacing: 15,
+                                childAspectRatio:
+                                    desktop ? 1.7 : 1.25,
+                                children: [
+                                  reportCard(
+                                    icon: Icons.history,
+                                    title: "Total Events",
+                                    value: "$totalEvents",
+                                    color:
+                                        AppColors.primary,
+                                  ),
+
+                                  reportCard(
+                                    icon:
+                                        Icons.check_circle,
+                                    title: "Clear Water",
+                                    value: "$clearCount",
+                                    color:
+                                        Colors.green,
+                                  ),
+
+                                  reportCard(
+                                    icon: Icons
+                                        .warning_rounded,
+                                    title: "Dirty Water",
+                                    value: "$dirtyCount",
+                                    color: Colors.red,
+                                  ),
+
+                                  reportCard(
+                                    icon:
+                                        Icons.water_drop,
+                                    title: "Valve Open",
+                                    value:
+                                        "$valveOpenCount",
+                                    color:
+                                        Colors.green,
+                                  ),
+
+                                  reportCard(
+                                    icon: Icons.block,
+                                    title:
+                                        "Valve Closed",
+                                    value:
+                                        "$valveClosedCount",
+                                    color: Colors.red,
+                                  ),
+
+                                  reportCard(
+                                    icon: Icons.speed,
+                                    title:
+                                        "Avg Turbidity",
+                                    value:
+                                        "${averageTurbidity.toStringAsFixed(1)} NTU",
+                                    color:
+                                        Colors.orange,
+                                  ),
+                                ],
+                              ),
+
+                              const SizedBox(height: 25),
+
+                              Container(
+                                width: double.infinity,
+                                padding:
+                                    const EdgeInsets.all(
+                                  24,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: Colors.white,
+                                  borderRadius:
+                                      BorderRadius.circular(
+                                    22,
+                                  ),
+                                  boxShadow: const [
+                                    BoxShadow(
+                                      color:
+                                          Colors.black12,
+                                      blurRadius: 8,
+                                      offset:
+                                          Offset(0, 4),
+                                    ),
+                                  ],
+                                ),
+                                child: Column(
+                                  crossAxisAlignment:
+                                      CrossAxisAlignment
+                                          .start,
+                                  children: [
+                                    const Text(
+                                      "Water Quality Distribution",
+                                      style: TextStyle(
+                                        fontSize: 19,
+                                        fontWeight:
+                                            FontWeight.bold,
+                                      ),
+                                    ),
+
+                                    const SizedBox(
+                                      height: 25,
+                                    ),
+
+                                    percentageRow(
+                                      title:
+                                          "Clear Water",
+                                      percentage:
+                                          clearPercentage,
+                                      color:
+                                          Colors.green,
+                                    ),
+
+                                    const SizedBox(
+                                      height: 22,
+                                    ),
+
+                                    percentageRow(
+                                      title:
+                                          "Dirty Water",
+                                      percentage:
+                                          dirtyPercentage,
+                                      color: Colors.red,
+                                    ),
+                                  ],
+                                ),
+                              ),
+
+                              const SizedBox(height: 25),
+
+                              Container(
+                                width: double.infinity,
+                                padding:
+                                    const EdgeInsets.all(
+                                  20,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: totalEvents == 0
+                                      ? Colors
+                                          .grey.shade100
+                                      : clearPercentage >=
+                                              dirtyPercentage
+                                          ? Colors
+                                              .green
+                                              .shade50
+                                          : Colors
+                                              .orange
+                                              .shade50,
+                                  borderRadius:
+                                      BorderRadius.circular(
+                                    20,
+                                  ),
+                                ),
+                                child: Row(
+                                  children: [
+                                    Icon(
+                                      totalEvents == 0
+                                          ? Icons
+                                              .info_outline
+                                          : clearPercentage >=
+                                                  dirtyPercentage
+                                              ? Icons
+                                                  .verified
+                                              : Icons
+                                                  .warning_amber_rounded,
+                                      color: totalEvents == 0
+                                          ? Colors.grey
+                                          : clearPercentage >=
+                                                  dirtyPercentage
+                                              ? Colors
+                                                  .green
+                                              : Colors
+                                                  .orange,
+                                      size: 35,
+                                    ),
+
+                                    const SizedBox(
+                                      width: 15,
+                                    ),
+
+                                    Expanded(
+                                      child: Text(
+                                        totalEvents == 0
+                                            ? "No report data available for this user yet."
+                                            : clearPercentage >=
+                                                    dirtyPercentage
+                                                ? "Most recorded water quality events are clear."
+                                                : "Dirty water events are higher than clear water events.",
+                                        style:
+                                            const TextStyle(
+                                          fontWeight:
+                                              FontWeight
+                                                  .w600,
+                                          height: 1.4,
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    );
+                  },
+                ),
     );
   }
 
   Widget reportCard({
+    required IconData icon,
     required String title,
     required String value,
-    required IconData icon,
     required Color color,
   }) {
     return Container(
       padding: const EdgeInsets.all(18),
-
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(20),
-
         boxShadow: const [
           BoxShadow(
             color: Colors.black12,
@@ -436,34 +493,44 @@ class _ReportsScreenState extends State<ReportsScreen> {
           ),
         ],
       ),
-
       child: Column(
+        mainAxisAlignment:
+            MainAxisAlignment.center,
         children: [
-          Icon(
-            icon,
-            size: 35,
-            color: color,
-          ),
-
-          const SizedBox(height: 10),
-
-          Text(
-            value,
-            style: TextStyle(
-              fontSize: 26,
-              fontWeight: FontWeight.bold,
+          Container(
+            padding: const EdgeInsets.all(10),
+            decoration: BoxDecoration(
+              color: color.withValues(
+                alpha: 0.12,
+              ),
+              shape: BoxShape.circle,
+            ),
+            child: Icon(
+              icon,
               color: color,
+              size: 30,
             ),
           ),
 
-          const SizedBox(height: 4),
+          const SizedBox(height: 12),
 
-          FittedBox(
-            child: Text(
-              title,
-              style: const TextStyle(
-                color: Colors.grey,
-              ),
+          Text(
+            value,
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              color: color,
+              fontSize: 21,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+
+          const SizedBox(height: 5),
+
+          Text(
+            title,
+            textAlign: TextAlign.center,
+            style: const TextStyle(
+              color: Colors.grey,
             ),
           ),
         ],
@@ -473,27 +540,24 @@ class _ReportsScreenState extends State<ReportsScreen> {
 
   Widget percentageRow({
     required String title,
-    required int count,
+    required double percentage,
     required Color color,
   }) {
-    double percentage = 0;
-
-    if (totalEvents > 0) {
-      percentage = count / totalEvents;
-    }
-
     return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Row(
-          mainAxisAlignment:
-              MainAxisAlignment.spaceBetween,
-
           children: [
-            Text(title),
+            Expanded(
+              child: Text(
+                title,
+                style: const TextStyle(
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
 
             Text(
-              "${(percentage * 100).toStringAsFixed(0)}%",
+              "${percentage.toStringAsFixed(1)}%",
               style: TextStyle(
                 color: color,
                 fontWeight: FontWeight.bold,
@@ -502,14 +566,17 @@ class _ReportsScreenState extends State<ReportsScreen> {
           ],
         ),
 
-        const SizedBox(height: 8),
+        const SizedBox(height: 10),
 
         LinearProgressIndicator(
-          value: percentage,
+          value:
+              (percentage / 100).clamp(0.0, 1.0),
           minHeight: 12,
-          borderRadius: BorderRadius.circular(20),
+          borderRadius:
+              BorderRadius.circular(20),
           color: color,
-          backgroundColor: Colors.grey.shade200,
+          backgroundColor:
+              Colors.grey.shade200,
         ),
       ],
     );

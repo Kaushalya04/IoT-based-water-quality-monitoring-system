@@ -54,7 +54,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
               },
               child: const Text("Cancel"),
             ),
-
             ElevatedButton(
               onPressed: () async {
                 final newName = nameController.text.trim();
@@ -76,9 +75,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
                 ScaffoldMessenger.of(this.context).showSnackBar(
                   const SnackBar(
-                    content: Text(
-                      "Profile updated successfully",
-                    ),
+                    content: Text("Profile updated successfully"),
                     backgroundColor: Colors.green,
                   ),
                 );
@@ -112,189 +109,216 @@ class _SettingsScreenState extends State<SettingsScreen> {
     return Scaffold(
       backgroundColor:
           darkMode ? const Color(0xff111827) : const Color(0xffF4F9FC),
-
       appBar: AppBar(
         title: const Text("Settings"),
         centerTitle: true,
       ),
+      body: LayoutBuilder(
+        builder: (context, constraints) {
+          final bool isDesktop = constraints.maxWidth >= 900;
 
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(20),
-
-        child: Column(
-          children: [
-            // Profile Card
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.all(22),
-
-              decoration: BoxDecoration(
-                gradient: const LinearGradient(
-                  colors: [
-                    Color(0xff0284C7),
-                    Color(0xff38BDF8),
-                  ],
+          return SingleChildScrollView(
+            padding: EdgeInsets.fromLTRB(
+              isDesktop ? 35 : 20,
+              20,
+              isDesktop ? 35 : 20,
+              140,
+            ),
+            child: Center(
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(
+                  maxWidth: 1100,
                 ),
-                borderRadius: BorderRadius.circular(25),
-              ),
-
-              child: Column(
-                children: [
-                  Stack(
-                    children: [
-                      const CircleAvatar(
-                        radius: 48,
-                        backgroundColor: Colors.white,
-                        child: Icon(
-                          Icons.person,
-                          size: 55,
-                          color: AppColors.primary,
-                        ),
-                      ),
-
-                      Positioned(
-                        right: 0,
-                        bottom: 0,
-                        child: Container(
-                          padding: const EdgeInsets.all(6),
-                          decoration: const BoxDecoration(
-                            color: Colors.white,
-                            shape: BoxShape.circle,
+                child: isDesktop
+                    ? Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          SizedBox(
+                            width: 330,
+                            child: buildProfileCard(),
                           ),
-                          child: const Icon(
-                            Icons.edit,
-                            size: 18,
-                            color: AppColors.primary,
+                          const SizedBox(width: 25),
+                          Expanded(
+                            child: buildSettingsContent(),
                           ),
-                        ),
+                        ],
+                      )
+                    : Column(
+                        children: [
+                          buildProfileCard(),
+                          const SizedBox(height: 25),
+                          buildSettingsContent(),
+                        ],
                       ),
-                    ],
-                  ),
-
-                  const SizedBox(height: 15),
-
-                  Text(
-                    userName,
-                    textAlign: TextAlign.center,
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 22,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-
-                  const SizedBox(height: 4),
-
-                  Text(
-                    userEmail,
-                    style: const TextStyle(
-                      color: Colors.white70,
-                    ),
-                  ),
-
-                  const SizedBox(height: 12),
-
-                  OutlinedButton.icon(
-                    onPressed: editProfile,
-                    icon: const Icon(Icons.edit),
-                    label: const Text("Edit Profile"),
-                    style: OutlinedButton.styleFrom(
-                      foregroundColor: Colors.white,
-                      side: const BorderSide(
-                        color: Colors.white,
-                      ),
-                    ),
-                  ),
-                ],
               ),
             ),
+          );
+        },
+      ),
+    );
+  }
 
-            const SizedBox(height: 25),
-
-            settingTile(
-              icon: Icons.dark_mode,
-              title: "Dark Mode",
-              subtitle: "Enable dark appearance",
-              trailing: Switch(
-                value: darkMode,
-                onChanged: (value) {
-                  setState(() {
-                    darkMode = value;
-                  });
-                },
-              ),
-            ),
-
-            settingTile(
-              icon: Icons.notifications,
-              title: "Notifications",
-              subtitle: "Water quality alerts",
-              trailing: Switch(
-                value: notifications,
-                onChanged: (value) {
-                  setState(() {
-                    notifications = value;
-                  });
-                },
-              ),
-            ),
-
-            settingTile(
-              icon: Icons.memory,
-              title: "Device",
-              subtitle: "ESP32 Water Monitor",
-              trailing: const Icon(
-                Icons.arrow_forward_ios,
-                size: 17,
-              ),
-            ),
-
-            settingTile(
-              icon: Icons.info_outline,
-              title: "About",
-              subtitle: "Water Quality Monitoring System",
-              trailing: const Icon(
-                Icons.arrow_forward_ios,
-                size: 17,
-              ),
-            ),
-
-            settingTile(
-              icon: Icons.system_update_alt,
-              title: "App Version",
-              subtitle: "1.0.0",
-              trailing: const Icon(
-                Icons.check_circle,
-                color: Colors.green,
-              ),
-            ),
-
-            const SizedBox(height: 20),
-
-            SizedBox(
-              width: double.infinity,
-              height: 55,
-              child: ElevatedButton.icon(
-                onPressed: logout,
-                icon: const Icon(Icons.logout),
-                label: const Text(
-                  "LOGOUT",
-                  style: TextStyle(
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.red,
-                  foregroundColor: Colors.white,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(15),
-                  ),
-                ),
-              ),
-            ),
+  Widget buildProfileCard() {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(25),
+      decoration: BoxDecoration(
+        gradient: const LinearGradient(
+          colors: [
+            Color(0xff0284C7),
+            Color(0xff38BDF8),
           ],
         ),
+        borderRadius: BorderRadius.circular(25),
       ),
+      child: Column(
+        children: [
+          Stack(
+            children: [
+              const CircleAvatar(
+                radius: 50,
+                backgroundColor: Colors.white,
+                child: Icon(
+                  Icons.person,
+                  size: 58,
+                  color: AppColors.primary,
+                ),
+              ),
+              Positioned(
+                right: 0,
+                bottom: 0,
+                child: Container(
+                  padding: const EdgeInsets.all(6),
+                  decoration: const BoxDecoration(
+                    color: Colors.white,
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(
+                    Icons.edit,
+                    size: 18,
+                    color: AppColors.primary,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          Text(
+            userName,
+            textAlign: TextAlign.center,
+            style: const TextStyle(
+              color: Colors.white,
+              fontSize: 22,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+          const SizedBox(height: 5),
+          Text(
+            userEmail,
+            textAlign: TextAlign.center,
+            style: const TextStyle(
+              color: Colors.white70,
+            ),
+          ),
+          const SizedBox(height: 18),
+          SizedBox(
+            width: double.infinity,
+            child: OutlinedButton.icon(
+              onPressed: editProfile,
+              icon: const Icon(Icons.edit),
+              label: const Text("Edit Profile"),
+              style: OutlinedButton.styleFrom(
+                foregroundColor: Colors.white,
+                side: const BorderSide(
+                  color: Colors.white,
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget buildSettingsContent() {
+    return Column(
+      children: [
+        settingTile(
+          icon: Icons.dark_mode,
+          title: "Dark Mode",
+          subtitle: "Enable dark appearance",
+          trailing: Switch(
+            value: darkMode,
+            onChanged: (value) {
+              setState(() {
+                darkMode = value;
+              });
+            },
+          ),
+        ),
+        settingTile(
+          icon: Icons.notifications,
+          title: "Notifications",
+          subtitle: "Water quality alerts",
+          trailing: Switch(
+            value: notifications,
+            onChanged: (value) {
+              setState(() {
+                notifications = value;
+              });
+            },
+          ),
+        ),
+        settingTile(
+          icon: Icons.memory,
+          title: "Device",
+          subtitle: "ESP32 Water Monitor",
+          trailing: const Icon(
+            Icons.arrow_forward_ios,
+            size: 17,
+          ),
+        ),
+        settingTile(
+          icon: Icons.info_outline,
+          title: "About",
+          subtitle: "Water Quality Monitoring System",
+          trailing: const Icon(
+            Icons.arrow_forward_ios,
+            size: 17,
+          ),
+        ),
+        settingTile(
+          icon: Icons.system_update_alt,
+          title: "App Version",
+          subtitle: "1.0.0",
+          trailing: const Icon(
+            Icons.check_circle,
+            color: Colors.green,
+          ),
+        ),
+        const SizedBox(height: 15),
+        SizedBox(
+          width: double.infinity,
+          height: 55,
+          child: ElevatedButton.icon(
+            onPressed: logout,
+            icon: const Icon(Icons.logout),
+            label: const Text(
+              "LOGOUT",
+              style: TextStyle(
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.red,
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(15),
+              ),
+            ),
+          ),
+        ),
+      ],
     );
   }
 
@@ -306,13 +330,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }) {
     return Container(
       margin: const EdgeInsets.only(bottom: 15),
-
       decoration: BoxDecoration(
         color: darkMode
             ? const Color(0xff1F2937)
             : Colors.white,
         borderRadius: BorderRadius.circular(18),
-
         boxShadow: const [
           BoxShadow(
             color: Colors.black12,
@@ -321,13 +343,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
           ),
         ],
       ),
-
       child: ListTile(
         leading: Icon(
           icon,
           color: AppColors.primary,
         ),
-
         title: Text(
           title,
           style: TextStyle(
@@ -337,7 +357,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 : Colors.black87,
           ),
         ),
-
         subtitle: Text(
           subtitle,
           style: TextStyle(
@@ -346,7 +365,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 : Colors.grey,
           ),
         ),
-
         trailing: trailing,
       ),
     );

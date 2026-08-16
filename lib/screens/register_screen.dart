@@ -1,4 +1,6 @@
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:firebase_core/firebase_core.dart';
+import 'package:firebase_database/firebase_database.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
@@ -13,36 +15,59 @@ class RegisterScreen extends StatefulWidget {
 }
 
 class _RegisterScreenState extends State<RegisterScreen> {
-  final nameController = TextEditingController();
-  final emailController = TextEditingController();
-  final passwordController = TextEditingController();
-  final confirmController = TextEditingController();
+  final TextEditingController nameController =
+      TextEditingController();
 
+  final TextEditingController emailController =
+      TextEditingController();
+
+  final TextEditingController passwordController =
+      TextEditingController();
+
+  final TextEditingController confirmPasswordController =
+      TextEditingController();
+
+  bool obscurePassword = true;
+  bool obscureConfirmPassword = true;
   bool isLoading = false;
-  bool hidePassword = true;
-  bool hideConfirmPassword = true;
 
   Future<void> registerUser() async {
-    final name = nameController.text.trim();
-    final email = emailController.text.trim();
-    final password = passwordController.text.trim();
-    final confirm = confirmController.text.trim();
+    final String name =
+        nameController.text.trim();
+
+    final String email =
+        emailController.text.trim();
+
+    final String password =
+        passwordController.text.trim();
+
+    final String confirmPassword =
+        confirmPasswordController.text.trim();
 
     if (name.isEmpty ||
         email.isEmpty ||
         password.isEmpty ||
-        confirm.isEmpty) {
-      showMessage("Please fill all fields");
-      return;
-    }
-
-    if (password != confirm) {
-      showMessage("Passwords do not match");
+        confirmPassword.isEmpty) {
+      showMessage(
+        "Please fill all fields",
+        Colors.orange,
+      );
       return;
     }
 
     if (password.length < 6) {
-      showMessage("Password must be at least 6 characters");
+      showMessage(
+        "Password must contain at least 6 characters",
+        Colors.orange,
+      );
+      return;
+    }
+
+    if (password != confirmPassword) {
+      showMessage(
+        "Passwords do not match",
+        Colors.orange,
+      );
       return;
     }
 
@@ -51,59 +76,117 @@ class _RegisterScreenState extends State<RegisterScreen> {
         isLoading = true;
       });
 
-      final credential =
+      final UserCredential credential =
           await FirebaseAuth.instance
               .createUserWithEmailAndPassword(
         email: email,
         password: password,
       );
 
-      await credential.user?.updateDisplayName(name);
+      final User? user = credential.user;
+
+      if (user == null) {
+        throw Exception(
+          "User account could not be created",
+        );
+      }
+
+      await user.updateDisplayName(name);
+
+      final FirebaseDatabase database =
+          FirebaseDatabase.instanceFor(
+        app: Firebase.app(),
+        databaseURL:
+            'https://water-quality-monitoring-94502-default-rtdb.asia-southeast1.firebasedatabase.app/',
+      );
+
+      final DatabaseReference userRef =
+          database.ref(
+        'users/${user.uid}',
+      );
+
+      await userRef.update({
+        'profile/name': name,
+        'profile/email': email,
+        'profile/uid': user.uid,
+        'profile/createdAt':
+            DateTime.now().millisecondsSinceEpoch,
+
+        'sensor/turbidity': 0,
+        'sensor/valve': 'UNKNOWN',
+        'sensor/waterStatus': 'UNKNOWN',
+        'sensor/deviceStatus': 'OFFLINE',
+        'sensor/manualOverride': false,
+      });
+
+      await FirebaseAuth.instance.signOut();
 
       if (!mounted) return;
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text(
-            "Account created successfully",
-          ),
-          backgroundColor: Colors.green,
-        ),
+      showMessage(
+        "Account created successfully",
+        Colors.green,
       );
 
+      await Future.delayed(
+        const Duration(milliseconds: 500),
+      );
+
+      if (!mounted) return;
+
       Navigator.pop(context);
-    }  on FirebaseAuthException catch (e) {
-  String message;
+    } on FirebaseAuthException catch (e) {
+      String message;
 
-  switch (e.code) {
-    case "email-already-in-use":
-      message = "This email is already registered";
-      break;
+      switch (e.code) {
+        case "email-already-in-use":
+          message =
+              "This email is already registered";
+          break;
 
-    case "invalid-email":
-      message = "Invalid email address";
-      break;
+        case "invalid-email":
+          message =
+              "Invalid email address";
+          break;
 
-    case "weak-password":
-      message = "Password is too weak";
-      break;
+        case "weak-password":
+          message =
+              "Password is too weak";
+          break;
 
-    case "operation-not-allowed":
-      message = "Email/Password login is not enabled in Firebase";
-      break;
+        case "operation-not-allowed":
+          message =
+              "Email/Password registration is not enabled";
+          break;
 
-    case "too-many-requests":
-      message = "Too many attempts. Try again later";
-      break;
+        case "too-many-requests":
+          message =
+              "Too many attempts. Try again later";
+          break;
 
-    default:
-      message = "${e.code}: ${e.message}";
-  }
+        case "network-request-failed":
+          message =
+              "Please check your internet connection";
+          break;
 
-  showMessage(message);
+        default:
+          message =
+              "${e.code}: ${e.message ?? 'Registration failed'}";
+      }
 
+      if (!mounted) return;
+
+      showMessage(
+        message,
+        Colors.red,
+      );
     } catch (e) {
-      showMessage("Something went wrong");
+      if (!mounted) return;
+
+      showMessage(
+        "Registration failed: $e",
+        Colors.red,
+      );
     } finally {
       if (mounted) {
         setState(() {
@@ -113,11 +196,15 @@ class _RegisterScreenState extends State<RegisterScreen> {
     }
   }
 
-  void showMessage(String message) {
+  void showMessage(
+    String message,
+    Color color,
+  ) {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(message),
-        backgroundColor: Colors.red,
+        backgroundColor: color,
+        behavior: SnackBarBehavior.floating,
       ),
     );
   }
@@ -127,7 +214,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
     nameController.dispose();
     emailController.dispose();
     passwordController.dispose();
-    confirmController.dispose();
+    confirmPasswordController.dispose();
+
     super.dispose();
   }
 
@@ -136,197 +224,372 @@ class _RegisterScreenState extends State<RegisterScreen> {
     return Scaffold(
       body: Container(
         width: double.infinity,
+        height: double.infinity,
 
         decoration: const BoxDecoration(
           gradient: LinearGradient(
-            colors: [
-              Color(0xff0EA5E9),
-              Color(0xff38BDF8),
-            ],
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
+            colors: [
+              Color(0xff0369A1),
+              Color(0xff0284C7),
+              Color(0xff38BDF8),
+            ],
           ),
         ),
 
-        child: Center(
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.all(20),
+        child: SafeArea(
+          child: Center(
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.all(22),
 
-            child: Container(
-              constraints:
-                  const BoxConstraints(maxWidth: 450),
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(
+                  maxWidth: 480,
+                ),
 
-              padding: const EdgeInsets.all(25),
-
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(25),
-
-                boxShadow: const [
-                  BoxShadow(
-                    color: Colors.black12,
-                    blurRadius: 15,
-                  ),
-                ],
-              ),
-
-              child: Column(
-                children: [
-                  const Icon(
-                    Icons.water_drop,
-                    color: AppColors.primary,
-                    size: 70,
-                  ),
-
-                  const SizedBox(height: 15),
-
-                  Text(
-                    "Create Account",
-                    style: GoogleFonts.poppins(
-                      fontSize: 28,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-
-                  const SizedBox(height: 30),
-
-                  TextField(
-                    controller: nameController,
-                    decoration: InputDecoration(
-                      labelText: "Full Name",
-                      prefixIcon:
-                          const Icon(Icons.person),
-                      border: OutlineInputBorder(
-                        borderRadius:
-                            BorderRadius.circular(15),
-                      ),
-                    ),
-                  ),
-
-                  const SizedBox(height: 15),
-
-                  TextField(
-                    controller: emailController,
-                    keyboardType:
-                        TextInputType.emailAddress,
-                    decoration: InputDecoration(
-                      labelText: "Email",
-                      prefixIcon:
-                          const Icon(Icons.email),
-                      border: OutlineInputBorder(
-                        borderRadius:
-                            BorderRadius.circular(15),
-                      ),
-                    ),
-                  ),
-
-                  const SizedBox(height: 15),
-
-                  TextField(
-                    controller: passwordController,
-                    obscureText: hidePassword,
-                    decoration: InputDecoration(
-                      labelText: "Password",
-                      prefixIcon:
-                          const Icon(Icons.lock),
-                      suffixIcon: IconButton(
-                        onPressed: () {
-                          setState(() {
-                            hidePassword =
-                                !hidePassword;
-                          });
-                        },
-                        icon: Icon(
-                          hidePassword
-                              ? Icons.visibility_off
-                              : Icons.visibility,
+                child: Column(
+                  children: [
+                    Align(
+                      alignment: Alignment.centerLeft,
+                      child: Container(
+                        decoration: BoxDecoration(
+                          color: Colors.white
+                              .withValues(alpha: 0.18),
+                          shape: BoxShape.circle,
+                        ),
+                        child: IconButton(
+                          onPressed: () {
+                            Navigator.pop(context);
+                          },
+                          icon: const Icon(
+                            Icons.arrow_back,
+                            color: Colors.white,
+                          ),
                         ),
                       ),
-                      border: OutlineInputBorder(
-                        borderRadius:
-                            BorderRadius.circular(15),
-                      ),
                     ),
-                  ),
 
-                  const SizedBox(height: 15),
+                    const SizedBox(height: 15),
 
-                  TextField(
-                    controller: confirmController,
-                    obscureText: hideConfirmPassword,
-                    decoration: InputDecoration(
-                      labelText: "Confirm Password",
-                      prefixIcon:
-                          const Icon(Icons.lock_outline),
-                      suffixIcon: IconButton(
-                        onPressed: () {
-                          setState(() {
-                            hideConfirmPassword =
-                                !hideConfirmPassword;
-                          });
-                        },
-                        icon: Icon(
-                          hideConfirmPassword
-                              ? Icons.visibility_off
-                              : Icons.visibility,
+                    Container(
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        color: Colors.white
+                            .withValues(alpha: 0.18),
+                        shape: BoxShape.circle,
+                        border: Border.all(
+                          color: Colors.white
+                              .withValues(alpha: 0.35),
                         ),
                       ),
-                      border: OutlineInputBorder(
-                        borderRadius:
-                            BorderRadius.circular(15),
+                      child: const Icon(
+                        Icons.water_drop,
+                        size: 55,
+                        color: Colors.white,
                       ),
                     ),
-                  ),
 
-                  const SizedBox(height: 30),
+                    const SizedBox(height: 15),
 
-                  SizedBox(
-                    width: double.infinity,
-                    height: 55,
+                    Text(
+                      "Create Account",
+                      style: GoogleFonts.poppins(
+                        fontSize: 30,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.white,
+                      ),
+                    ),
 
-                    child: ElevatedButton(
-                      onPressed:
-                          isLoading ? null : registerUser,
+                    const SizedBox(height: 5),
 
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor:
-                            AppColors.primary,
+                    Text(
+                      "Water Quality Monitoring System",
+                      textAlign: TextAlign.center,
+                      style: GoogleFonts.poppins(
+                        fontSize: 14,
+                        color: Colors.white70,
+                      ),
+                    ),
 
-                        shape: RoundedRectangleBorder(
-                          borderRadius:
-                              BorderRadius.circular(15),
-                        ),
+                    const SizedBox(height: 28),
+
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.all(25),
+
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius:
+                            BorderRadius.circular(28),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black
+                                .withValues(alpha: 0.15),
+                            blurRadius: 25,
+                            offset: const Offset(0, 12),
+                          ),
+                        ],
                       ),
 
-                      child: isLoading
-                          ? const CircularProgressIndicator(
-                              color: Colors.white,
-                            )
-                          : const Text(
-                              "REGISTER",
-                              style: TextStyle(
-                                color: Colors.white,
-                                fontSize: 18,
-                                fontWeight:
-                                    FontWeight.bold,
+                      child: Column(
+                        children: [
+                          buildTextField(
+                            controller:
+                                nameController,
+                            label: "Full Name",
+                            icon:
+                                Icons.person_outline,
+                            keyboardType:
+                                TextInputType.name,
+                          ),
+
+                          const SizedBox(height: 16),
+
+                          buildTextField(
+                            controller:
+                                emailController,
+                            label: "Email Address",
+                            icon:
+                                Icons.email_outlined,
+                            keyboardType:
+                                TextInputType
+                                    .emailAddress,
+                          ),
+
+                          const SizedBox(height: 16),
+
+                          buildPasswordField(
+                            controller:
+                                passwordController,
+                            label: "Password",
+                            obscure:
+                                obscurePassword,
+                            onToggle: () {
+                              setState(() {
+                                obscurePassword =
+                                    !obscurePassword;
+                              });
+                            },
+                          ),
+
+                          const SizedBox(height: 16),
+
+                          buildPasswordField(
+                            controller:
+                                confirmPasswordController,
+                            label:
+                                "Confirm Password",
+                            obscure:
+                                obscureConfirmPassword,
+                            onToggle: () {
+                              setState(() {
+                                obscureConfirmPassword =
+                                    !obscureConfirmPassword;
+                              });
+                            },
+                          ),
+
+                          const SizedBox(height: 25),
+
+                          SizedBox(
+                            width: double.infinity,
+                            height: 56,
+
+                            child: ElevatedButton(
+                              onPressed:
+                                  isLoading
+                                      ? null
+                                      : registerUser,
+
+                              style: ElevatedButton
+                                  .styleFrom(
+                                backgroundColor:
+                                    AppColors.primary,
+                                foregroundColor:
+                                    Colors.white,
+
+                                shape:
+                                    RoundedRectangleBorder(
+                                  borderRadius:
+                                      BorderRadius
+                                          .circular(16),
+                                ),
+
+                                elevation: 0,
                               ),
+
+                              child: isLoading
+                                  ? const SizedBox(
+                                      width: 24,
+                                      height: 24,
+                                      child:
+                                          CircularProgressIndicator(
+                                        strokeWidth: 2,
+                                        color:
+                                            Colors.white,
+                                      ),
+                                    )
+                                  : Text(
+                                      "CREATE ACCOUNT",
+                                      style:
+                                          GoogleFonts.poppins(
+                                        fontSize: 15,
+                                        fontWeight:
+                                            FontWeight
+                                                .w600,
+                                      ),
+                                    ),
                             ),
-                    ),
-                  ),
+                          ),
 
-                  const SizedBox(height: 15),
+                          const SizedBox(height: 18),
 
-                  TextButton(
-                    onPressed: () {
-                      Navigator.pop(context);
-                    },
-                    child: const Text(
-                      "Already have an account? Login",
+                          Row(
+                            mainAxisAlignment:
+                                MainAxisAlignment.center,
+                            children: [
+                              Text(
+                                "Already have an account?",
+                                style:
+                                    GoogleFonts.poppins(
+                                  fontSize: 13,
+                                  color:
+                                      Colors.grey.shade600,
+                                ),
+                              ),
+
+                              TextButton(
+                                onPressed: () {
+                                  Navigator.pop(
+                                    context,
+                                  );
+                                },
+                                child: Text(
+                                  "Login",
+                                  style:
+                                      GoogleFonts.poppins(
+                                    color:
+                                        AppColors.primary,
+                                    fontWeight:
+                                        FontWeight.bold,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
                     ),
-                  ),
-                ],
+
+                    const SizedBox(height: 25),
+                  ],
+                ),
               ),
             ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget buildTextField({
+    required TextEditingController controller,
+    required String label,
+    required IconData icon,
+    required TextInputType keyboardType,
+  }) {
+    return TextField(
+      controller: controller,
+      keyboardType: keyboardType,
+
+      decoration: InputDecoration(
+        labelText: label,
+
+        prefixIcon: Icon(
+          icon,
+          color: AppColors.primary,
+        ),
+
+        filled: true,
+        fillColor: const Color(0xffF8FAFC),
+
+        border: OutlineInputBorder(
+          borderRadius:
+              BorderRadius.circular(15),
+          borderSide: BorderSide.none,
+        ),
+
+        enabledBorder: OutlineInputBorder(
+          borderRadius:
+              BorderRadius.circular(15),
+          borderSide: BorderSide(
+            color: Colors.grey.shade200,
+          ),
+        ),
+
+        focusedBorder: OutlineInputBorder(
+          borderRadius:
+              BorderRadius.circular(15),
+          borderSide: const BorderSide(
+            color: AppColors.primary,
+            width: 2,
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget buildPasswordField({
+    required TextEditingController controller,
+    required String label,
+    required bool obscure,
+    required VoidCallback onToggle,
+  }) {
+    return TextField(
+      controller: controller,
+      obscureText: obscure,
+
+      decoration: InputDecoration(
+        labelText: label,
+
+        prefixIcon: const Icon(
+          Icons.lock_outline,
+          color: AppColors.primary,
+        ),
+
+        suffixIcon: IconButton(
+          onPressed: onToggle,
+          icon: Icon(
+            obscure
+                ? Icons.visibility_off_outlined
+                : Icons.visibility_outlined,
+          ),
+        ),
+
+        filled: true,
+        fillColor: const Color(0xffF8FAFC),
+
+        border: OutlineInputBorder(
+          borderRadius:
+              BorderRadius.circular(15),
+          borderSide: BorderSide.none,
+        ),
+
+        enabledBorder: OutlineInputBorder(
+          borderRadius:
+              BorderRadius.circular(15),
+          borderSide: BorderSide(
+            color: Colors.grey.shade200,
+          ),
+        ),
+
+        focusedBorder: OutlineInputBorder(
+          borderRadius:
+              BorderRadius.circular(15),
+          borderSide: const BorderSide(
+            color: AppColors.primary,
+            width: 2,
           ),
         ),
       ),

@@ -1,3 +1,4 @@
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_database/firebase_database.dart';
 import 'package:flutter/material.dart';
@@ -13,7 +14,8 @@ class MonitoringScreen extends StatefulWidget {
 
 class _MonitoringScreenState extends State<MonitoringScreen> {
   late final FirebaseDatabase database;
-  late final DatabaseReference sensorRef;
+
+  DatabaseReference? sensorRef;
 
   double turbidity = 0;
   String valve = "UNKNOWN";
@@ -27,95 +29,101 @@ class _MonitoringScreenState extends State<MonitoringScreen> {
   void initState() {
     super.initState();
 
-    // Connect directly to your Realtime Database
     database = FirebaseDatabase.instanceFor(
       app: Firebase.app(),
       databaseURL:
           'https://water-quality-monitoring-94502-default-rtdb.asia-southeast1.firebasedatabase.app/',
     );
 
-    // Firebase path:
-    // sensor
-    //   turbidity
-    //   valve
-    //   waterStatus
-    sensorRef = database.ref('sensor');
+    setupUserDatabase();
+  }
+
+  void setupUserDatabase() {
+    final User? user = FirebaseAuth.instance.currentUser;
+
+    if (user == null) {
+      setState(() {
+        isLoading = false;
+        isConnected = false;
+        errorMessage = "No logged-in user found";
+      });
+
+      return;
+    }
+
+    sensorRef = database.ref(
+      'users/${user.uid}/sensor',
+    );
 
     listenToSensorData();
   }
 
   void listenToSensorData() {
-    sensorRef.onValue.listen(
+    sensorRef!.onValue.listen(
       (DatabaseEvent event) {
         if (!mounted) return;
 
         final value = event.snapshot.value;
 
-        if (value == null) {
+        if (value == null || value is! Map) {
           setState(() {
-            isLoading = false;
+            turbidity = 0;
+            valve = "UNKNOWN";
             isConnected = false;
-            errorMessage = "No sensor data found";
+            isLoading = false;
+            errorMessage =
+                "No sensor data available for this user";
           });
 
           return;
         }
 
-        if (value is Map) {
-          final data = Map<dynamic, dynamic>.from(value);
+        final data =
+            Map<dynamic, dynamic>.from(value);
 
-          final rawTurbidity = data['turbidity'];
+        final rawTurbidity = data['turbidity'];
 
-          double newTurbidity = 0;
+        double newTurbidity = 0;
 
-          if (rawTurbidity is num) {
-            newTurbidity = rawTurbidity.toDouble();
-          } else {
-            newTurbidity =
-                double.tryParse(rawTurbidity.toString()) ?? 0;
-          }
-
-          setState(() {
-            turbidity = newTurbidity;
-
-            valve =
-                data['valve']?.toString().toUpperCase() ??
-                    "UNKNOWN";
-
-            isConnected = true;
-            isLoading = false;
-            errorMessage = null;
-          });
+        if (rawTurbidity is num) {
+          newTurbidity =
+              rawTurbidity.toDouble();
         } else {
-          setState(() {
-            isLoading = false;
-            isConnected = false;
-            errorMessage = "Invalid sensor data";
-          });
+          newTurbidity =
+              double.tryParse(
+                    rawTurbidity.toString(),
+                  ) ??
+                  0;
         }
-      },
 
+        setState(() {
+          turbidity = newTurbidity;
+
+          valve =
+              data['valve']
+                      ?.toString()
+                      .toUpperCase() ??
+                  "UNKNOWN";
+
+          isConnected = true;
+          isLoading = false;
+          errorMessage = null;
+        });
+      },
       onError: (Object error) {
         if (!mounted) return;
 
         setState(() {
-          isLoading = false;
           isConnected = false;
+          isLoading = false;
           errorMessage = error.toString();
         });
-
-        debugPrint("Firebase Database Error: $error");
       },
     );
   }
 
-  // Automatic Water Quality Logic
   String get waterStatus {
-    if (turbidity < 300) {
-      return "CLEAR";
-    } else {
-      return "DIRTY";
-    }
+    return turbidity < 300 ? "CLEAR" : "DIRTY";
   }
 
   bool get isClean => waterStatus == "CLEAR";
@@ -141,197 +149,318 @@ class _MonitoringScreenState extends State<MonitoringScreen> {
         centerTitle: true,
       ),
 
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(20),
+      body: LayoutBuilder(
+        builder: (context, constraints) {
+          final bool isDesktop =
+              constraints.maxWidth >= 800;
 
-        child: Column(
-          children: [
-            // Sensor connection
-            monitoringCard(
-              icon: isConnected
-                  ? Icons.wifi
-                  : Icons.wifi_off,
-              title: "Sensor Status",
-              value: isConnected
-                  ? "CONNECTED"
-                  : "DISCONNECTED",
-              color: isConnected
-                  ? Colors.green
-                  : Colors.red,
+          return SingleChildScrollView(
+            padding: EdgeInsets.fromLTRB(
+              isDesktop ? 35 : 20,
+              20,
+              isDesktop ? 35 : 20,
+              120,
             ),
 
-            if (errorMessage != null) ...[
-              const SizedBox(height: 15),
-
-              Container(
-                width: double.infinity,
-                padding: const EdgeInsets.all(15),
-                decoration: BoxDecoration(
-                  color: Colors.red.shade50,
-                  borderRadius: BorderRadius.circular(15),
+            child: Center(
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(
+                  maxWidth: 900,
                 ),
-                child: Text(
-                  errorMessage!,
-                  style: const TextStyle(
-                    color: Colors.red,
-                  ),
-                ),
-              ),
-            ],
 
-            const SizedBox(height: 20),
-
-            // Turbidity Card
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.all(25),
-
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(25),
-
-                boxShadow: const [
-                  BoxShadow(
-                    color: Colors.black12,
-                    blurRadius: 10,
-                    offset: Offset(0, 5),
-                  ),
-                ],
-              ),
-
-              child: Column(
-                children: [
-                  const Icon(
-                    Icons.speed,
-                    size: 55,
-                    color: AppColors.primary,
-                  ),
-
-                  const SizedBox(height: 15),
-
-                  const Text(
-                    "Turbidity Level",
-                    style: TextStyle(
-                      fontSize: 18,
-                    ),
-                  ),
-
-                  const SizedBox(height: 10),
-
-                  Text(
-                    "${turbidity.toInt()} NTU",
-                    style: const TextStyle(
-                      fontSize: 36,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-
-                  const SizedBox(height: 20),
-
-                  LinearProgressIndicator(
-                    value:
-                        (turbidity / 1000).clamp(0.0, 1.0),
-                    minHeight: 15,
-                    borderRadius:
-                        BorderRadius.circular(20),
-                    color: isClean
-                        ? Colors.green
-                        : Colors.red,
-                    backgroundColor:
-                        Colors.grey.shade200,
-                  ),
-
-                  const SizedBox(height: 10),
-
-                  Text(
-                    isClean
-                        ? "Normal Range"
-                        : "High Turbidity Detected",
-                    style: TextStyle(
-                      color: isClean
+                child: Column(
+                  children: [
+                    monitoringCard(
+                      icon: isConnected
+                          ? Icons.wifi
+                          : Icons.wifi_off,
+                      title: "Sensor Status",
+                      value: isConnected
+                          ? "CONNECTED"
+                          : "DISCONNECTED",
+                      color: isConnected
                           ? Colors.green
                           : Colors.red,
-                      fontWeight: FontWeight.w600,
                     ),
-                  ),
-                ],
-              ),
-            ),
 
-            const SizedBox(height: 20),
+                    if (errorMessage != null) ...[
+                      const SizedBox(height: 15),
 
-            // Water Quality
-            monitoringCard(
-              icon: isClean
-                  ? Icons.check_circle
-                  : Icons.warning_rounded,
-              title: "Water Quality",
-              value: waterStatus,
-              color: isClean
-                  ? Colors.green
-                  : Colors.red,
-            ),
+                      Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.all(15),
+                        decoration: BoxDecoration(
+                          color: Colors.orange.shade50,
+                          borderRadius:
+                              BorderRadius.circular(15),
+                        ),
+                        child: Row(
+                          children: [
+                            const Icon(
+                              Icons.info_outline,
+                              color: Colors.orange,
+                            ),
+                            const SizedBox(width: 10),
+                            Expanded(
+                              child: Text(
+                                errorMessage!,
+                                style: TextStyle(
+                                  color:
+                                      Colors.orange.shade900,
+                                  fontWeight:
+                                      FontWeight.w600,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
 
-            const SizedBox(height: 20),
+                    const SizedBox(height: 20),
 
-            // Valve
-            monitoringCard(
-              icon: isValveOpen
-                  ? Icons.water_drop
-                  : Icons.block,
-              title: "Solenoid Valve",
-              value: valve,
-              color: isValveOpen
-                  ? Colors.green
-                  : Colors.red,
-            ),
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.all(28),
 
-            const SizedBox(height: 20),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius:
+                            BorderRadius.circular(25),
+                        boxShadow: const [
+                          BoxShadow(
+                            color: Colors.black12,
+                            blurRadius: 10,
+                            offset: Offset(0, 5),
+                          ),
+                        ],
+                      ),
 
-            // Flow information
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.all(18),
+                      child: Column(
+                        children: [
+                          Container(
+                            padding:
+                                const EdgeInsets.all(15),
+                            decoration: BoxDecoration(
+                              color: AppColors.primary
+                                  .withValues(alpha: 0.12),
+                              shape: BoxShape.circle,
+                            ),
+                            child: Icon(
+                              isConnected
+                                  ? Icons.speed
+                                  : Icons.sensors_off,
+                              size: 50,
+                              color: isConnected
+                                  ? AppColors.primary
+                                  : Colors.grey,
+                            ),
+                          ),
 
-              decoration: BoxDecoration(
-                color: isClean
-                    ? Colors.green.shade50
-                    : Colors.red.shade50,
-                borderRadius: BorderRadius.circular(20),
-              ),
+                          const SizedBox(height: 15),
 
-              child: Row(
-                children: [
-                  Icon(
-                    isClean
-                        ? Icons.water
-                        : Icons.warning_amber_rounded,
-                    color: isClean
-                        ? Colors.green
-                        : Colors.red,
-                    size: 35,
-                  ),
+                          const Text(
+                            "Turbidity Level",
+                            style: TextStyle(
+                              fontSize: 18,
+                            ),
+                          ),
 
-                  const SizedBox(width: 15),
+                          const SizedBox(height: 10),
 
-                  Expanded(
-                    child: Text(
-                      isClean
-                          ? "Water is clear. Water can flow normally."
-                          : "Dirty water detected. Water flow should be blocked.",
-                      style: TextStyle(
-                        color: isClean
-                            ? Colors.green.shade800
-                            : Colors.red.shade800,
-                        fontWeight: FontWeight.w600,
+                          Text(
+                            isConnected
+                                ? "${turbidity.toInt()} NTU"
+                                : "--",
+                            style: TextStyle(
+                              fontSize:
+                                  isDesktop ? 42 : 36,
+                              fontWeight:
+                                  FontWeight.bold,
+                              color: !isConnected
+                                  ? Colors.grey
+                                  : isClean
+                                      ? Colors.green
+                                      : Colors.red,
+                            ),
+                          ),
+
+                          const SizedBox(height: 20),
+
+                          LinearProgressIndicator(
+                            value: isConnected
+                                ? (turbidity / 1000)
+                                    .clamp(0.0, 1.0)
+                                : 0,
+                            minHeight: 15,
+                            borderRadius:
+                                BorderRadius.circular(20),
+                            color: !isConnected
+                                ? Colors.grey
+                                : isClean
+                                    ? Colors.green
+                                    : Colors.red,
+                            backgroundColor:
+                                Colors.grey.shade200,
+                          ),
+
+                          const SizedBox(height: 12),
+
+                          Text(
+                            !isConnected
+                                ? "Waiting for sensor data"
+                                : isClean
+                                    ? "Water condition is clear"
+                                    : "High turbidity detected",
+                            style: TextStyle(
+                              color: !isConnected
+                                  ? Colors.grey
+                                  : isClean
+                                      ? Colors.green
+                                      : Colors.red,
+                              fontWeight:
+                                  FontWeight.w600,
+                            ),
+                          ),
+                        ],
                       ),
                     ),
-                  ),
-                ],
+
+                    const SizedBox(height: 20),
+
+                    if (isDesktop)
+                      Row(
+                        children: [
+                          Expanded(
+                            child: monitoringCard(
+                              icon: !isConnected
+                                  ? Icons.help_outline
+                                  : isClean
+                                      ? Icons.check_circle
+                                      : Icons.warning_rounded,
+                              title: "Water Quality",
+                              value: !isConnected
+                                  ? "UNKNOWN"
+                                  : waterStatus,
+                              color: !isConnected
+                                  ? Colors.grey
+                                  : isClean
+                                      ? Colors.green
+                                      : Colors.red,
+                            ),
+                          ),
+
+                          const SizedBox(width: 20),
+
+                          Expanded(
+                            child: monitoringCard(
+                              icon: isValveOpen
+                                  ? Icons.water_drop
+                                  : Icons.block,
+                              title: "Solenoid Valve",
+                              value: valve,
+                              color: isValveOpen
+                                  ? Colors.green
+                                  : valve == "CLOSED"
+                                      ? Colors.red
+                                      : Colors.grey,
+                            ),
+                          ),
+                        ],
+                      )
+                    else ...[
+                      monitoringCard(
+                        icon: !isConnected
+                            ? Icons.help_outline
+                            : isClean
+                                ? Icons.check_circle
+                                : Icons.warning_rounded,
+                        title: "Water Quality",
+                        value: !isConnected
+                            ? "UNKNOWN"
+                            : waterStatus,
+                        color: !isConnected
+                            ? Colors.grey
+                            : isClean
+                                ? Colors.green
+                                : Colors.red,
+                      ),
+
+                      const SizedBox(height: 20),
+
+                      monitoringCard(
+                        icon: isValveOpen
+                            ? Icons.water_drop
+                            : Icons.block,
+                        title: "Solenoid Valve",
+                        value: valve,
+                        color: isValveOpen
+                            ? Colors.green
+                            : valve == "CLOSED"
+                                ? Colors.red
+                                : Colors.grey,
+                      ),
+                    ],
+
+                    const SizedBox(height: 20),
+
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.all(20),
+                      decoration: BoxDecoration(
+                        color: !isConnected
+                            ? Colors.grey.shade100
+                            : isClean
+                                ? Colors.green.shade50
+                                : Colors.red.shade50,
+                        borderRadius:
+                            BorderRadius.circular(20),
+                      ),
+                      child: Row(
+                        children: [
+                          Icon(
+                            !isConnected
+                                ? Icons.info_outline
+                                : isClean
+                                    ? Icons.check_circle
+                                    : Icons.warning_amber_rounded,
+                            color: !isConnected
+                                ? Colors.grey
+                                : isClean
+                                    ? Colors.green
+                                    : Colors.red,
+                            size: 38,
+                          ),
+
+                          const SizedBox(width: 15),
+
+                          Expanded(
+                            child: Text(
+                              !isConnected
+                                  ? "No sensor data is available for this user."
+                                  : isClean
+                                      ? "Water is clear and can flow normally."
+                                      : "Dirty water detected. Water flow should be blocked.",
+                              style: TextStyle(
+                                color: !isConnected
+                                    ? Colors.grey.shade700
+                                    : isClean
+                                        ? Colors.green.shade800
+                                        : Colors.red.shade800,
+                                fontWeight:
+                                    FontWeight.w600,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
               ),
             ),
-          ],
-        ),
+          );
+        },
       ),
     );
   }
@@ -349,7 +478,6 @@ class _MonitoringScreenState extends State<MonitoringScreen> {
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(20),
-
         boxShadow: const [
           BoxShadow(
             color: Colors.black12,
@@ -363,12 +491,10 @@ class _MonitoringScreenState extends State<MonitoringScreen> {
         children: [
           Container(
             padding: const EdgeInsets.all(12),
-
             decoration: BoxDecoration(
               color: color.withValues(alpha: 0.12),
               borderRadius: BorderRadius.circular(15),
             ),
-
             child: Icon(
               icon,
               size: 35,
@@ -378,28 +504,28 @@ class _MonitoringScreenState extends State<MonitoringScreen> {
 
           const SizedBox(width: 18),
 
-          Column(
-            crossAxisAlignment:
-                CrossAxisAlignment.start,
-            children: [
-              Text(
-                title,
-                style: const TextStyle(
-                  color: Colors.grey,
+          Expanded(
+            child: Column(
+              crossAxisAlignment:
+                  CrossAxisAlignment.start,
+              children: [
+                Text(
+                  title,
+                  style: const TextStyle(
+                    color: Colors.grey,
+                  ),
                 ),
-              ),
-
-              const SizedBox(height: 4),
-
-              Text(
-                value,
-                style: TextStyle(
-                  fontSize: 20,
-                  fontWeight: FontWeight.bold,
-                  color: color,
+                const SizedBox(height: 4),
+                Text(
+                  value,
+                  style: TextStyle(
+                    fontSize: 20,
+                    fontWeight: FontWeight.bold,
+                    color: color,
+                  ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         ],
       ),

@@ -1,3 +1,6 @@
+import 'dart:async';
+
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_database/firebase_database.dart';
 import 'package:flutter/material.dart';
@@ -11,7 +14,9 @@ class HistoryScreen extends StatefulWidget {
 
 class _HistoryScreenState extends State<HistoryScreen> {
   late final FirebaseDatabase database;
-  late final DatabaseReference historyRef;
+
+  DatabaseReference? historyRef;
+  StreamSubscription<DatabaseEvent>? historySubscription;
 
   List<Map<String, dynamic>> historyList = [];
 
@@ -28,26 +33,45 @@ class _HistoryScreenState extends State<HistoryScreen> {
           'https://water-quality-monitoring-94502-default-rtdb.asia-southeast1.firebasedatabase.app/',
     );
 
-    historyRef = database.ref('history');
+    setupUserHistory();
+  }
+
+  void setupUserHistory() {
+    final User? user = FirebaseAuth.instance.currentUser;
+
+    if (user == null) {
+      setState(() {
+        isLoading = false;
+        errorMessage = "No logged-in user found";
+      });
+
+      return;
+    }
+
+    historyRef = database.ref(
+      'users/${user.uid}/history',
+    );
 
     listenHistory();
   }
 
   void listenHistory() {
-    historyRef.onValue.listen(
+    historySubscription = historyRef!.onValue.listen(
       (DatabaseEvent event) {
         if (!mounted) return;
 
         final value = event.snapshot.value;
 
         if (value is Map) {
-          final data = Map<dynamic, dynamic>.from(value);
+          final data =
+              Map<dynamic, dynamic>.from(value);
 
           final List<Map<String, dynamic>> tempList = [];
 
           data.forEach((key, value) {
             if (value is Map) {
-              final item = Map<dynamic, dynamic>.from(value);
+              final item =
+                  Map<dynamic, dynamic>.from(value);
 
               tempList.add({
                 'id': key.toString(),
@@ -56,13 +80,15 @@ class _HistoryScreenState extends State<HistoryScreen> {
                             ?.toString()
                             .toUpperCase() ??
                         'UNKNOWN',
-                'turbidity': _toInt(item['turbidity']),
+                'turbidity':
+                    _toInt(item['turbidity']),
                 'valve':
                     item['valve']
                             ?.toString()
                             .toUpperCase() ??
                         'UNKNOWN',
-                'timestamp': _toInt(item['timestamp']),
+                'timestamp':
+                    _toInt(item['timestamp']),
               });
             }
           });
@@ -98,15 +124,16 @@ class _HistoryScreenState extends State<HistoryScreen> {
   }
 
   int _toInt(dynamic value) {
-    if (value is int) {
-      return value;
-    }
+    if (value is int) return value;
 
     if (value is num) {
       return value.toInt();
     }
 
-    return int.tryParse(value?.toString() ?? '') ?? 0;
+    return int.tryParse(
+          value?.toString() ?? '',
+        ) ??
+        0;
   }
 
   String formatDateTime(int timestamp) {
@@ -125,12 +152,11 @@ class _HistoryScreenState extends State<HistoryScreen> {
 
     final String year = date.year.toString();
 
-    final int hour =
-        date.hour == 0
-            ? 12
-            : date.hour > 12
-                ? date.hour - 12
-                : date.hour;
+    final int hour = date.hour == 0
+        ? 12
+        : date.hour > 12
+            ? date.hour - 12
+            : date.hour;
 
     final String minute =
         date.minute.toString().padLeft(2, '0');
@@ -139,6 +165,12 @@ class _HistoryScreenState extends State<HistoryScreen> {
         date.hour >= 12 ? "PM" : "AM";
 
     return "$day/$month/$year • $hour:$minute $period";
+  }
+
+  @override
+  void dispose() {
+    historySubscription?.cancel();
+    super.dispose();
   }
 
   @override
@@ -151,219 +183,246 @@ class _HistoryScreenState extends State<HistoryScreen> {
         centerTitle: true,
       ),
 
-      body: isLoading
-          ? const Center(
+      body: LayoutBuilder(
+        builder: (context, constraints) {
+          final bool isDesktop =
+              constraints.maxWidth >= 800;
+
+          if (isLoading) {
+            return const Center(
               child: CircularProgressIndicator(),
-            )
-          : errorMessage != null
-              ? Center(
-                  child: Padding(
-                    padding: const EdgeInsets.all(20),
-                    child: Text(
-                      errorMessage!,
-                      textAlign: TextAlign.center,
-                      style: const TextStyle(
-                        color: Colors.red,
-                      ),
+            );
+          }
+
+          if (errorMessage != null) {
+            return Center(
+              child: Padding(
+                padding: const EdgeInsets.all(20),
+                child: Text(
+                  errorMessage!,
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(
+                    color: Colors.red,
+                  ),
+                ),
+              ),
+            );
+          }
+
+          if (historyList.isEmpty) {
+            return const Center(
+              child: Column(
+                mainAxisAlignment:
+                    MainAxisAlignment.center,
+                children: [
+                  Icon(
+                    Icons.history,
+                    size: 70,
+                    color: Colors.grey,
+                  ),
+                  SizedBox(height: 15),
+                  Text(
+                    "No history records for this user",
+                    style: TextStyle(
+                      fontSize: 18,
+                      color: Colors.grey,
                     ),
                   ),
-                )
-              : historyList.isEmpty
-                  ? const Center(
-                      child: Column(
-                        mainAxisAlignment:
-                            MainAxisAlignment.center,
-                        children: [
-                          Icon(
-                            Icons.history,
-                            size: 70,
-                            color: Colors.grey,
-                          ),
-                          SizedBox(height: 15),
-                          Text(
-                            "No history records yet",
-                            style: TextStyle(
-                              fontSize: 18,
-                              color: Colors.grey,
-                            ),
-                          ),
-                        ],
-                      ),
-                    )
-                  : ListView.builder(
-                      padding: const EdgeInsets.all(16),
-                      itemCount: historyList.length,
-                      itemBuilder: (context, index) {
-                        final item =
-                            historyList[index];
+                ],
+              ),
+            );
+          }
 
-                        final bool isClear =
-                            item['waterStatus'] ==
-                                "CLEAR";
+          return Center(
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(
+                maxWidth: 1000,
+              ),
+              child: ListView.builder(
+                padding: EdgeInsets.fromLTRB(
+                  isDesktop ? 35 : 16,
+                  20,
+                  isDesktop ? 35 : 16,
+                  120,
+                ),
+                itemCount: historyList.length,
+                itemBuilder: (context, index) {
+                  final item = historyList[index];
 
-                        final bool valveOpen =
-                            item['valve'] == "OPEN";
+                  final bool isClear =
+                      item['waterStatus'] == "CLEAR";
 
-                        return Container(
-                          margin: const EdgeInsets.only(
-                            bottom: 15,
-                          ),
-                          padding:
-                              const EdgeInsets.all(18),
-                          decoration: BoxDecoration(
-                            color: Colors.white,
-                            borderRadius:
-                                BorderRadius.circular(
-                              20,
-                            ),
-                            boxShadow: const [
-                              BoxShadow(
-                                color: Colors.black12,
-                                blurRadius: 8,
-                                offset: Offset(0, 4),
+                  final bool valveOpen =
+                      item['valve'] == "OPEN";
+
+                  return Container(
+                    margin: const EdgeInsets.only(
+                      bottom: 16,
+                    ),
+                    padding: const EdgeInsets.all(20),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius:
+                          BorderRadius.circular(22),
+                      boxShadow: const [
+                        BoxShadow(
+                          color: Colors.black12,
+                          blurRadius: 8,
+                          offset: Offset(0, 4),
+                        ),
+                      ],
+                    ),
+                    child: isDesktop
+                        ? Row(
+                            children: [
+                              Expanded(
+                                flex: 2,
+                                child: buildStatusSection(
+                                  isClear,
+                                  item,
+                                ),
+                              ),
+                              Expanded(
+                                child: buildValveSection(
+                                  valveOpen,
+                                  item,
+                                ),
+                              ),
+                              Expanded(
+                                child: buildTimeSection(
+                                  item,
+                                ),
                               ),
                             ],
-                          ),
-                          child: Column(
+                          )
+                        : Column(
                             crossAxisAlignment:
                                 CrossAxisAlignment.start,
                             children: [
-                              Row(
-                                mainAxisAlignment:
-                                    MainAxisAlignment
-                                        .spaceBetween,
-                                children: [
-                                  Row(
-                                    children: [
-                                      Icon(
-                                        isClear
-                                            ? Icons
-                                                .check_circle
-                                            : Icons
-                                                .warning_rounded,
-                                        color: isClear
-                                            ? Colors.green
-                                            : Colors.red,
-                                      ),
-
-                                      const SizedBox(
-                                        width: 10,
-                                      ),
-
-                                      Text(
-                                        item[
-                                            'waterStatus'],
-                                        style: TextStyle(
-                                          fontSize: 18,
-                                          fontWeight:
-                                              FontWeight
-                                                  .bold,
-                                          color: isClear
-                                              ? Colors.green
-                                              : Colors.red,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-
-                                  Container(
-                                    padding:
-                                        const EdgeInsets
-                                            .symmetric(
-                                      horizontal: 12,
-                                      vertical: 6,
-                                    ),
-                                    decoration:
-                                        BoxDecoration(
-                                      color: isClear
-                                          ? Colors.green
-                                              .shade50
-                                          : Colors.red
-                                              .shade50,
-                                      borderRadius:
-                                          BorderRadius
-                                              .circular(
-                                        20,
-                                      ),
-                                    ),
-                                    child: Text(
-                                      "${item['turbidity']} NTU",
-                                      style: TextStyle(
-                                        fontWeight:
-                                            FontWeight.bold,
-                                        color: isClear
-                                            ? Colors.green
-                                            : Colors.red,
-                                      ),
-                                    ),
-                                  ),
-                                ],
+                              buildStatusSection(
+                                isClear,
+                                item,
                               ),
-
                               const SizedBox(height: 18),
-
-                              Row(
-                                children: [
-                                  Icon(
-                                    valveOpen
-                                        ? Icons.water_drop
-                                        : Icons.block,
-                                    color: valveOpen
-                                        ? Colors.green
-                                        : Colors.red,
-                                  ),
-
-                                  const SizedBox(
-                                    width: 10,
-                                  ),
-
-                                  Text(
-                                    "Valve: ${item['valve']}",
-                                    style:
-                                        const TextStyle(
-                                      fontWeight:
-                                          FontWeight.w600,
-                                      fontSize: 16,
-                                    ),
-                                  ),
-                                ],
-                              ),
-
-                              const SizedBox(height: 15),
-
                               const Divider(),
-
-                              const SizedBox(height: 10),
-
-                              Row(
-                                children: [
-                                  const Icon(
-                                    Icons.access_time,
-                                    size: 20,
-                                    color: Colors.grey,
-                                  ),
-
-                                  const SizedBox(
-                                    width: 8,
-                                  ),
-
-                                  Text(
-                                    formatDateTime(
-                                      item['timestamp']
-                                          as int,
-                                    ),
-                                    style:
-                                        const TextStyle(
-                                      color: Colors.grey,
-                                    ),
-                                  ),
-                                ],
+                              const SizedBox(height: 12),
+                              buildValveSection(
+                                valveOpen,
+                                item,
+                              ),
+                              const SizedBox(height: 15),
+                              buildTimeSection(
+                                item,
                               ),
                             ],
                           ),
-                        );
-                      },
-                    ),
+                  );
+                },
+              ),
+            ),
+          );
+        },
+      ),
+    );
+  }
+
+  Widget buildStatusSection(
+    bool isClear,
+    Map<String, dynamic> item,
+  ) {
+    return Row(
+      children: [
+        Container(
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            color: isClear
+                ? Colors.green.shade50
+                : Colors.red.shade50,
+            borderRadius: BorderRadius.circular(15),
+          ),
+          child: Icon(
+            isClear
+                ? Icons.check_circle
+                : Icons.warning_rounded,
+            color:
+                isClear ? Colors.green : Colors.red,
+          ),
+        ),
+        const SizedBox(width: 14),
+        Column(
+          crossAxisAlignment:
+              CrossAxisAlignment.start,
+          children: [
+            Text(
+              item['waterStatus'],
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+                color:
+                    isClear ? Colors.green : Colors.red,
+              ),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              "${item['turbidity']} NTU",
+              style: const TextStyle(
+                color: Colors.grey,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+
+  Widget buildValveSection(
+    bool valveOpen,
+    Map<String, dynamic> item,
+  ) {
+    return Row(
+      children: [
+        Icon(
+          valveOpen
+              ? Icons.water_drop
+              : Icons.block,
+          color: valveOpen
+              ? Colors.green
+              : Colors.red,
+        ),
+        const SizedBox(width: 10),
+        Text(
+          "Valve: ${item['valve']}",
+          style: const TextStyle(
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget buildTimeSection(
+    Map<String, dynamic> item,
+  ) {
+    return Row(
+      children: [
+        const Icon(
+          Icons.access_time,
+          size: 20,
+          color: Colors.grey,
+        ),
+        const SizedBox(width: 8),
+        Flexible(
+          child: Text(
+            formatDateTime(
+              item['timestamp'] as int,
+            ),
+            style: const TextStyle(
+              color: Colors.grey,
+            ),
+          ),
+        ),
+      ],
     );
   }
 }

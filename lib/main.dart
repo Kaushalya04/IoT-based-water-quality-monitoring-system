@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
 
@@ -13,8 +14,11 @@ Future<void> main() async {
     options: DefaultFirebaseOptions.currentPlatform,
   );
 
-  // Start automatic water quality + valve logic
-  HistoryService.start();
+  // Run automatic water quality + valve logic only on Android/mobile.
+  // This prevents duplicate history when Web and Mobile are open together.
+  if (!kIsWeb) {
+    HistoryService.start();
+  }
 
   runApp(const WaterQualityApp());
 }

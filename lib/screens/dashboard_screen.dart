@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_database/firebase_database.dart';
@@ -195,6 +197,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
     required String title,
   }) {
     final bool selected = currentIndex == index;
+
     final bool isDark =
         Theme.of(context).brightness == Brightness.dark;
 
@@ -267,6 +270,7 @@ class _HomePageState extends State<HomePage> {
   late final FirebaseDatabase database;
 
   DatabaseReference? sensorRef;
+  StreamSubscription<DatabaseEvent>? sensorSubscription;
 
   double turbidity = 0;
 
@@ -275,6 +279,7 @@ class _HomePageState extends State<HomePage> {
   String deviceStatus = "OFFLINE";
 
   bool isLoading = true;
+
   String? errorMessage;
 
   @override
@@ -299,6 +304,7 @@ class _HomePageState extends State<HomePage> {
         isLoading = false;
         errorMessage = "No logged-in user found";
       });
+
       return;
     }
 
@@ -310,47 +316,15 @@ class _HomePageState extends State<HomePage> {
   }
 
   void listenFirebase() {
-    sensorRef!.onValue.listen(
+    sensorSubscription =
+        sensorRef!.onValue.listen(
       (DatabaseEvent event) {
         if (!mounted) return;
 
-        final value = event.snapshot.value;
+        final dynamic value =
+            event.snapshot.value;
 
-        if (value is Map) {
-          final data =
-              Map<dynamic, dynamic>.from(value);
-
-          final raw = data["turbidity"];
-
-          double newTurbidity = 0;
-
-          if (raw is num) {
-            newTurbidity = raw.toDouble();
-          } else {
-            newTurbidity =
-                double.tryParse(raw.toString()) ?? 0;
-          }
-
-          setState(() {
-            turbidity = newTurbidity;
-
-            waterStatus =
-                turbidity < 300 ? "CLEAR" : "DIRTY";
-
-            valve =
-                data["valve"]?.toString().toUpperCase() ??
-                    "UNKNOWN";
-
-            deviceStatus =
-                data["deviceStatus"]
-                        ?.toString()
-                        .toUpperCase() ??
-                    "OFFLINE";
-
-            isLoading = false;
-            errorMessage = null;
-          });
-        } else {
+        if (value == null || value is! Map) {
           setState(() {
             turbidity = 0;
             waterStatus = "UNKNOWN";
@@ -362,7 +336,58 @@ class _HomePageState extends State<HomePage> {
             errorMessage =
                 "No sensor data available for this user";
           });
+
+          return;
         }
+
+        final Map<dynamic, dynamic> data =
+            Map<dynamic, dynamic>.from(value);
+
+        final dynamic raw =
+            data["turbidity"];
+
+        double newTurbidity = 0;
+
+        if (raw is num) {
+          newTurbidity = raw.toDouble();
+        } else {
+          newTurbidity =
+              double.tryParse(
+                    raw?.toString() ?? '',
+                  ) ??
+                  0;
+        }
+
+        setState(() {
+          turbidity = newTurbidity;
+
+          // IMPORTANT:
+          // Use Arduino/Firebase status.
+          // Do NOT calculate threshold here.
+          waterStatus =
+              data["waterStatus"]
+                      ?.toString()
+                      .trim()
+                      .toUpperCase() ??
+                  "UNKNOWN";
+
+          valve =
+              data["valve"]
+                      ?.toString()
+                      .trim()
+                      .toUpperCase() ??
+                  "UNKNOWN";
+
+          deviceStatus =
+              data["deviceStatus"]
+                      ?.toString()
+                      .trim()
+                      .toUpperCase() ??
+                  "OFFLINE";
+
+          isLoading = false;
+          errorMessage = null;
+        });
       },
       onError: (Object error) {
         if (!mounted) return;
@@ -382,9 +407,16 @@ class _HomePageState extends State<HomePage> {
       valve == "OPEN";
 
   @override
+  void dispose() {
+    sensorSubscription?.cancel();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
     final bool isDark =
-        Theme.of(context).brightness == Brightness.dark;
+        Theme.of(context).brightness ==
+            Brightness.dark;
 
     final Color backgroundColor = isDark
         ? const Color(0xff0F172A)
@@ -429,7 +461,9 @@ class _HomePageState extends State<HomePage> {
               child: Center(
                 child: ConstrainedBox(
                   constraints:
-                      const BoxConstraints(maxWidth: 1200),
+                      const BoxConstraints(
+                    maxWidth: 1200,
+                  ),
                   child: Column(
                     crossAxisAlignment:
                         CrossAxisAlignment.start,
@@ -457,7 +491,8 @@ class _HomePageState extends State<HomePage> {
 
                         Container(
                           width: double.infinity,
-                          padding: const EdgeInsets.all(16),
+                          padding:
+                              const EdgeInsets.all(16),
                           decoration: BoxDecoration(
                             color: isDark
                                 ? const Color(0xff3B2F1B)
@@ -494,20 +529,21 @@ class _HomePageState extends State<HomePage> {
                         padding: const EdgeInsets.all(30),
                         decoration: BoxDecoration(
                           gradient: LinearGradient(
-                            colors: waterStatus == "UNKNOWN"
-                                ? const [
-                                    Color(0xff475569),
-                                    Color(0xff64748B),
-                                  ]
-                                : clean
+                            colors:
+                                waterStatus == "UNKNOWN"
                                     ? const [
-                                        Color(0xff0284C7),
-                                        Color(0xff38BDF8),
+                                        Color(0xff475569),
+                                        Color(0xff64748B),
                                       ]
-                                    : const [
-                                        Color(0xffDC2626),
-                                        Color(0xffF97316),
-                                      ],
+                                    : clean
+                                        ? const [
+                                            Color(0xff0284C7),
+                                            Color(0xff38BDF8),
+                                          ]
+                                        : const [
+                                            Color(0xffDC2626),
+                                            Color(0xffF97316),
+                                          ],
                           ),
                           borderRadius:
                               BorderRadius.circular(30),
@@ -565,14 +601,16 @@ class _HomePageState extends State<HomePage> {
                             context: context,
                             icon: Icons.speed,
                             title: "Turbidity",
-                            value: waterStatus == "UNKNOWN"
-                                ? "--"
-                                : "${turbidity.toInt()} NTU",
-                            color: waterStatus == "UNKNOWN"
-                                ? Colors.grey
-                                : clean
-                                    ? AppColors.primary
-                                    : Colors.red,
+                            value:
+                                waterStatus == "UNKNOWN"
+                                    ? "--"
+                                    : "${turbidity.toInt()} RAW",
+                            color:
+                                waterStatus == "UNKNOWN"
+                                    ? Colors.grey
+                                    : clean
+                                        ? AppColors.primary
+                                        : Colors.red,
                           ),
 
                           statusCard(
@@ -591,14 +629,16 @@ class _HomePageState extends State<HomePage> {
 
                           statusCard(
                             context: context,
-                            icon: deviceStatus == "ONLINE"
-                                ? Icons.wifi
-                                : Icons.wifi_off,
-                            title: "ESP32 Device",
+                            icon:
+                                deviceStatus == "ONLINE"
+                                    ? Icons.wifi
+                                    : Icons.wifi_off,
+                            title: "ESP8266 Device",
                             value: deviceStatus,
-                            color: deviceStatus == "ONLINE"
-                                ? Colors.green
-                                : Colors.red,
+                            color:
+                                deviceStatus == "ONLINE"
+                                    ? Colors.green
+                                    : Colors.red,
                           ),
                         ],
                       ),
@@ -619,15 +659,18 @@ class _HomePageState extends State<HomePage> {
                         },
                         child: Container(
                           width: double.infinity,
-                          padding: const EdgeInsets.all(20),
+                          padding:
+                              const EdgeInsets.all(20),
                           decoration: BoxDecoration(
                             color: cardColor,
                             borderRadius:
                                 BorderRadius.circular(20),
                             boxShadow: [
                               BoxShadow(
-                                color: Colors.black.withValues(
-                                  alpha: isDark ? 0.25 : 0.08,
+                                color:
+                                    Colors.black.withValues(
+                                  alpha:
+                                      isDark ? 0.25 : 0.08,
                                 ),
                                 blurRadius: 8,
                               ),
@@ -658,7 +701,8 @@ class _HomePageState extends State<HomePage> {
                               Icon(
                                 Icons.arrow_forward_ios,
                                 size: 18,
-                                color: secondaryTextColor,
+                                color:
+                                    secondaryTextColor,
                               ),
                             ],
                           ),
@@ -683,7 +727,8 @@ class _HomePageState extends State<HomePage> {
     required Color color,
   }) {
     final bool isDark =
-        Theme.of(context).brightness == Brightness.dark;
+        Theme.of(context).brightness ==
+            Brightness.dark;
 
     return Container(
       padding: const EdgeInsets.all(20),
@@ -706,8 +751,10 @@ class _HomePageState extends State<HomePage> {
           Container(
             padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
-              color: color.withValues(alpha: 0.15),
-              borderRadius: BorderRadius.circular(15),
+              color:
+                  color.withValues(alpha: 0.15),
+              borderRadius:
+                  BorderRadius.circular(15),
             ),
             child: Icon(
               icon,
@@ -741,7 +788,8 @@ class _HomePageState extends State<HomePage> {
                   style: TextStyle(
                     color: color,
                     fontSize: 18,
-                    fontWeight: FontWeight.bold,
+                    fontWeight:
+                        FontWeight.bold,
                   ),
                 ),
               ],

@@ -7,16 +7,30 @@ import 'package:firebase_database/firebase_database.dart';
 class HistoryService {
   static bool _started = false;
 
-  static StreamSubscription<User?>? _authSubscription;
-  static StreamSubscription<DatabaseEvent>? _sensorSubscription;
+  static StreamSubscription<User?>?
+      _authSubscription;
+
+  static StreamSubscription<DatabaseEvent>?
+      _sensorSubscription;
 
   static String? _activeUid;
 
-  static String? _lastStatus;
+  static String? _lastWaterStatus;
   static String? _lastValve;
 
-  // Ensures sensor events are handled one by one.
-  static Future<void> _eventQueue = Future.value();
+  static Future<void> _eventQueue =
+      Future.value();
+
+  static late final FirebaseDatabase _database =
+      FirebaseDatabase.instanceFor(
+    app: Firebase.app(),
+    databaseURL:
+        'https://water-quality-monitoring-94502-default-rtdb.asia-southeast1.firebasedatabase.app/',
+  );
+
+  // ====================================================
+  // Start Service
+  // ====================================================
 
   static void start() {
     if (_started) return;
@@ -31,15 +45,21 @@ class HistoryService {
     );
   }
 
-  static Future<void> _switchUser(User? user) async {
+  // ====================================================
+  // Switch Firebase User
+  // ====================================================
+
+  static Future<void> _switchUser(
+    User? user,
+  ) async {
     await _sensorSubscription?.cancel();
 
     _sensorSubscription = null;
 
-    _lastStatus = null;
-    _lastValve = null;
+    _activeUid = null;
 
-    _activeUid = user?.uid;
+    _lastWaterStatus = null;
+    _lastValve = null;
 
     _eventQueue = Future.value();
 
@@ -49,29 +69,23 @@ class HistoryService {
 
     final String uid = user.uid;
 
-    final FirebaseDatabase database =
-        FirebaseDatabase.instanceFor(
-      app: Firebase.app(),
-      databaseURL:
-          'https://water-quality-monitoring-94502-default-rtdb.asia-southeast1.firebasedatabase.app/',
-    );
+    _activeUid = uid;
 
     final DatabaseReference sensorRef =
-        database.ref(
+        _database.ref(
       'users/$uid/sensor',
     );
 
     final DatabaseReference historyRef =
-        database.ref(
+        _database.ref(
       'users/$uid/history',
     );
 
     _sensorSubscription =
         sensorRef.onValue.listen(
       (DatabaseEvent event) {
-        // Add every event to a queue.
-        // This prevents overlapping async handlers.
-        _eventQueue = _eventQueue.then(
+        _eventQueue = _eventQueue
+            .then(
           (_) async {
             if (_activeUid != uid) {
               return;
@@ -79,7 +93,6 @@ class HistoryService {
 
             await _handleSensorEvent(
               event: event,
-              sensorRef: sensorRef,
               historyRef: historyRef,
               uid: uid,
             );
@@ -92,12 +105,20 @@ class HistoryService {
           },
         );
       },
+      onError: (Object error) {
+        print(
+          "HistoryService sensor error: $error",
+        );
+      },
     );
   }
 
+  // ====================================================
+  // Handle Sensor Data
+  // ====================================================
+
   static Future<void> _handleSensorEvent({
     required DatabaseEvent event,
-    required DatabaseReference sensorRef,
     required DatabaseReference historyRef,
     required String uid,
   }) async {
@@ -105,133 +126,173 @@ class HistoryService {
       return;
     }
 
-    final value = event.snapshot.value;
+    final dynamic value =
+        event.snapshot.value;
 
-    if (value is! Map) {
+    if (value == null ||
+        value is! Map) {
       return;
     }
 
-    final data =
-        Map<dynamic, dynamic>.from(value);
+    final Map<dynamic, dynamic> data =
+        Map<dynamic, dynamic>.from(
+      value,
+    );
 
-    final rawTurbidity =
-        data['turbidity'];
+    // --------------------------------------------------
+    // Read ESP8266 final values
+    // --------------------------------------------------
 
-    double turbidity = 0;
+    final String waterStatus =
+        data['waterStatus']
+                ?.toString()
+                .trim()
+                .toUpperCase() ??
+            'UNKNOWN';
 
-    if (rawTurbidity is num) {
-      turbidity =
-          rawTurbidity.toDouble();
-    } else {
-      turbidity =
-          double.tryParse(
-            rawTurbidity.toString(),
-          ) ??
-          0;
-    }
+    final String valve =
+        data['valve']
+                ?.toString()
+                .trim()
+                .toUpperCase() ??
+            'UNKNOWN';
 
-    final String status =
-        turbidity < 300
-            ? 'CLEAR'
-            : 'DIRTY';
+    final double turbidity =
+        _toDouble(
+      data['turbidity'],
+    );
+
+    final String deviceStatus =
+        data['deviceStatus']
+                ?.toString()
+                .trim()
+                .toUpperCase() ??
+            'UNKNOWN';
 
     final bool manualOverride =
         data['manualOverride'] == true;
 
-    String currentValve =
-        data['valve']
+    final bool manualButton =
+        data['manualButton'] == true;
+
+    final String controlMode =
+        data['controlMode']
                 ?.toString()
+                .trim()
                 .toUpperCase() ??
-            'UNKNOWN';
+            'AUTO';
 
-    final String currentStatus =
-        data['waterStatus']
-                ?.toString()
-                .toUpperCase() ??
-            'UNKNOWN';
+    // --------------------------------------------------
+    // Ignore incomplete sensor state
+    // --------------------------------------------------
 
-    String desiredValve;
-
-    if (status == 'CLEAR') {
-      desiredValve = 'OPEN';
-    } else {
-      desiredValve =
-          manualOverride
-              ? 'OPEN'
-              : 'CLOSED';
+    if (waterStatus == 'UNKNOWN' ||
+        valve == 'UNKNOWN') {
+      return;
     }
 
-    // Initial sensor state:
-    // save as baseline only.
-    if (_lastStatus == null &&
+    // --------------------------------------------------
+    // First Firebase event = baseline only
+    //
+    // Don't create history simply because app opened.
+    // --------------------------------------------------
+
+    if (_lastWaterStatus == null &&
         _lastValve == null) {
-      final Map<String, Object?> updates = {};
+      _lastWaterStatus =
+          waterStatus;
 
-      if (currentStatus != status) {
-        updates['waterStatus'] = status;
-      }
-
-      if (currentValve != desiredValve) {
-        updates['valve'] = desiredValve;
-      }
-
-      if (status == 'CLEAR' &&
-          manualOverride) {
-        updates['manualOverride'] = false;
-      }
-
-      if (updates.isNotEmpty) {
-        await sensorRef.update(updates);
-      }
-
-      _lastStatus = status;
-      _lastValve = desiredValve;
+      _lastValve =
+          valve;
 
       return;
     }
 
-    final Map<String, Object?> updates = {};
+    // --------------------------------------------------
+    // Create history only if water status OR valve changed
+    // --------------------------------------------------
 
-    if (currentStatus != status) {
-      updates['waterStatus'] = status;
-    }
+    final bool statusChanged =
+        _lastWaterStatus !=
+            waterStatus;
 
-    if (currentValve != desiredValve) {
-      updates['valve'] = desiredValve;
-      currentValve = desiredValve;
-    }
+    final bool valveChanged =
+        _lastValve != valve;
 
-    if (status == 'CLEAR' &&
-        manualOverride) {
-      updates['manualOverride'] = false;
-    }
-
-    // Do one Firebase update instead of multiple set() calls.
-    if (updates.isNotEmpty) {
-      await sensorRef.update(updates);
-    }
-
-    if (_activeUid != uid) {
+    if (!statusChanged &&
+        !valveChanged) {
       return;
     }
 
-    // Record only when final system state actually changed.
-    if (_lastStatus != status ||
-        _lastValve != desiredValve) {
-      await historyRef.push().set({
-        'waterStatus': status,
-        'turbidity':
-            turbidity.toInt(),
-        'valve': desiredValve,
-        'timestamp':
-            DateTime.now()
-                .millisecondsSinceEpoch,
-      });
+    // --------------------------------------------------
+    // Update local state BEFORE async push
+    // Prevent duplicate events
+    // --------------------------------------------------
 
-      _lastStatus = status;
-      _lastValve = desiredValve;
-    }
+    _lastWaterStatus =
+        waterStatus;
+
+    _lastValve =
+        valve;
+
+    // --------------------------------------------------
+    // Push history
+    // --------------------------------------------------
+
+    await historyRef.push().set({
+      'waterStatus':
+          waterStatus,
+
+      'turbidity':
+          turbidity,
+
+      'valve':
+          valve,
+
+      'deviceStatus':
+          deviceStatus,
+
+      'manualOverride':
+          manualOverride,
+
+      'manualButton':
+          manualButton,
+
+      'controlMode':
+          controlMode,
+
+      'timestamp':
+          ServerValue.timestamp,
+    });
+
+    print(
+      "History added: "
+      "$waterStatus | "
+      "$valve | "
+      "$turbidity",
+    );
   }
+
+  // ====================================================
+  // Convert Firebase value to double
+  // ====================================================
+
+  static double _toDouble(
+    dynamic value,
+  ) {
+    if (value is num) {
+      return value.toDouble();
+    }
+
+    return double.tryParse(
+          value?.toString() ?? '',
+        ) ??
+        0;
+  }
+
+  // ====================================================
+  // Stop Service
+  // ====================================================
 
   static Future<void> stop() async {
     await _sensorSubscription?.cancel();
@@ -242,10 +303,11 @@ class HistoryService {
 
     _activeUid = null;
 
-    _lastStatus = null;
+    _lastWaterStatus = null;
     _lastValve = null;
 
-    _eventQueue = Future.value();
+    _eventQueue =
+        Future.value();
 
     _started = false;
   }
